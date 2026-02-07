@@ -1,0 +1,13 @@
+[package]
+name = "nix-mcp-server"
+version = "0.1.0"
+edition = "2021"
+description = "MCP server providing nix operations as tools for Claude Code"
+
+[dependencies]
+tokio = { version = "1", features = ["full"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "1"
+regex = "1"
+anyhow = "1"

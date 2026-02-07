@@ -1,0 +1,72 @@
+use crate::nix_runner::run_nix_command;
+use crate::tools::NixEvalParams;
+use crate::validators::{validate_installable, validate_no_shell_metacharacters};
+use serde::Serialize;
+
+#[derive(Debug, Serialize)]
+pub struct NixEvalResult {
+    pub success: bool,
+    pub value: serde_json::Value,
+    pub stderr: String,
+}
+
+pub async fn nix_eval(params: NixEvalParams) -> Result<NixEvalResult, String> {
+    let mut args = vec!["eval", "--json"];
+
+    let installable: Option<String>;
+    let expr: Option<String>;
+    let apply: Option<String>;
+
+    if let Some(ref i) = params.installable {
+        validate_installable(i).map_err(|e| e.to_string())?;
+        installable = Some(i.clone());
+    } else {
+        installable = None;
+    }
+
+    if let Some(ref e) = params.expr {
+        validate_no_shell_metacharacters(e).map_err(|e| e.to_string())?;
+        expr = Some(e.clone());
+    } else {
+        expr = None;
+    }
+
+    if let Some(ref a) = params.apply {
+        validate_no_shell_metacharacters(a).map_err(|e| e.to_string())?;
+        apply = Some(a.clone());
+    } else {
+        apply = None;
+    }
+
+    if let Some(ref i) = installable {
+        args.push(i);
+    }
+
+    if let Some(ref e) = expr {
+        args.push("--expr");
+        args.push(e);
+    }
+
+    if let Some(ref a) = apply {
+        args.push("--apply");
+        args.push(a);
+    }
+
+    if installable.is_none() && expr.is_none() {
+        return Err("Either 'installable' or 'expr' must be provided".to_string());
+    }
+
+    let result = run_nix_command(&args).await.map_err(|e| e.to_string())?;
+
+    let value = if result.success {
+        serde_json::from_str(&result.stdout).unwrap_or(serde_json::Value::Null)
+    } else {
+        serde_json::Value::Null
+    };
+
+    Ok(NixEvalResult {
+        success: result.success,
+        value,
+        stderr: result.stderr,
+    })
+}
