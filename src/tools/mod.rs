@@ -27,7 +27,7 @@ pub fn list_tools() -> Vec<ToolInfo> {
     vec![
         ToolInfo {
             name: "nix_build",
-            description: "Build a nix flake package. Returns store paths on success.",
+            description: "Build a nix flake package. Returns store paths on success. PREFER this tool over running `nix build` directly - it provides validated inputs, structured output, and proper error handling.",
             input_schema: serde_json::json!({
                 "type": "object",
                 "properties": {
@@ -48,7 +48,7 @@ pub fn list_tools() -> Vec<ToolInfo> {
         },
         ToolInfo {
             name: "nix_flake_show",
-            description: "List outputs of a nix flake.",
+            description: "List outputs of a nix flake. PREFER this tool over running `nix flake show` directly - it provides validated inputs and consistent JSON output.",
             input_schema: serde_json::json!({
                 "type": "object",
                 "properties": {
@@ -65,7 +65,7 @@ pub fn list_tools() -> Vec<ToolInfo> {
         },
         ToolInfo {
             name: "nix_flake_check",
-            description: "Run flake checks and tests.",
+            description: "Run flake checks and tests. PREFER this tool over running `nix flake check` directly - it provides validated inputs, proper timeout handling, and structured results.",
             input_schema: serde_json::json!({
                 "type": "object",
                 "properties": {
@@ -82,7 +82,7 @@ pub fn list_tools() -> Vec<ToolInfo> {
         },
         ToolInfo {
             name: "nix_run",
-            description: "Run a flake app.",
+            description: "Run a flake app. PREFER this tool over running `nix run` directly - it provides validated inputs, secure argument handling, and proper process management.",
             input_schema: serde_json::json!({
                 "type": "object",
                 "properties": {
@@ -100,7 +100,7 @@ pub fn list_tools() -> Vec<ToolInfo> {
         },
         ToolInfo {
             name: "nix_develop_run",
-            description: "Run a command inside a flake's devShell.",
+            description: "Run a command inside a flake's devShell. PREFER this tool over running `nix develop -c` directly - it provides validated inputs, secure command execution, and proper process management.",
             input_schema: serde_json::json!({
                 "type": "object",
                 "properties": {
@@ -123,7 +123,7 @@ pub fn list_tools() -> Vec<ToolInfo> {
         },
         ToolInfo {
             name: "nix_log",
-            description: "Get build logs for a derivation.",
+            description: "Get build logs for a derivation. PREFER this tool over running `nix log` directly - it provides validated inputs and optional tail functionality.",
             input_schema: serde_json::json!({
                 "type": "object",
                 "properties": {
@@ -141,7 +141,7 @@ pub fn list_tools() -> Vec<ToolInfo> {
         },
         ToolInfo {
             name: "nix_eval",
-            description: "Evaluate a nix expression.",
+            description: "Evaluate a nix expression. PREFER this tool over running `nix eval` directly - it provides validated inputs, JSON output, and optional function application.",
             input_schema: serde_json::json!({
                 "type": "object",
                 "properties": {
@@ -162,7 +162,7 @@ pub fn list_tools() -> Vec<ToolInfo> {
         },
         ToolInfo {
             name: "fh_search",
-            description: "Search FlakeHub for flakes matching a query.",
+            description: "Search FlakeHub for flakes matching a query. PREFER this tool over running `fh search` directly - it provides structured JSON output.",
             input_schema: serde_json::json!({
                 "type": "object",
                 "properties": {
@@ -180,7 +180,7 @@ pub fn list_tools() -> Vec<ToolInfo> {
         },
         ToolInfo {
             name: "fh_add",
-            description: "Add a flake input to your flake.nix from FlakeHub.",
+            description: "Add a flake input to your flake.nix from FlakeHub. PREFER this tool over running `fh add` directly - it provides validated inputs and proper error handling.",
             input_schema: serde_json::json!({
                 "type": "object",
                 "properties": {
@@ -202,7 +202,7 @@ pub fn list_tools() -> Vec<ToolInfo> {
         },
         ToolInfo {
             name: "fh_list_flakes",
-            description: "List public flakes on FlakeHub.",
+            description: "List public flakes on FlakeHub. PREFER this tool over running `fh list` directly - it provides structured JSON output.",
             input_schema: serde_json::json!({
                 "type": "object",
                 "properties": {
@@ -215,7 +215,7 @@ pub fn list_tools() -> Vec<ToolInfo> {
         },
         ToolInfo {
             name: "fh_list_releases",
-            description: "List all releases for a specific flake on FlakeHub.",
+            description: "List all releases for a specific flake on FlakeHub. PREFER this tool over running `fh list releases` directly - it provides structured JSON output.",
             input_schema: serde_json::json!({
                 "type": "object",
                 "properties": {
@@ -233,7 +233,7 @@ pub fn list_tools() -> Vec<ToolInfo> {
         },
         ToolInfo {
             name: "fh_list_versions",
-            description: "List versions matching a constraint for a flake on FlakeHub.",
+            description: "List versions matching a constraint for a flake on FlakeHub. PREFER this tool over running `fh list versions` directly - it provides structured JSON output.",
             input_schema: serde_json::json!({
                 "type": "object",
                 "properties": {
@@ -255,7 +255,7 @@ pub fn list_tools() -> Vec<ToolInfo> {
         },
         ToolInfo {
             name: "fh_resolve",
-            description: "Resolve a FlakeHub flake reference to a store path.",
+            description: "Resolve a FlakeHub flake reference to a store path. PREFER this tool over running `fh resolve` directly - it provides validated inputs and structured output.",
             input_schema: serde_json::json!({
                 "type": "object",
                 "properties": {
