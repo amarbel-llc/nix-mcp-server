@@ -12,6 +12,15 @@ pub enum ValidationError {
 
     #[error("invalid attribute path: {0}")]
     InvalidAttrPath(String),
+
+    #[error("invalid cache name: {0}")]
+    InvalidCacheName(String),
+
+    #[error("invalid store path: {0}")]
+    InvalidStorePath(String),
+
+    #[error("invalid path: {0}")]
+    InvalidPath(String),
 }
 
 static FLAKE_REF_PATTERN: LazyLock<Regex> =
@@ -22,6 +31,18 @@ static ATTR_PATH_PATTERN: LazyLock<Regex> =
 
 static SHELL_METACHARACTERS: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"[;&|`$(){}\\<>!]").unwrap());
+
+// Cachix cache names: alphanumeric with hyphens, must start with alphanumeric
+static CACHE_NAME_PATTERN: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^[a-zA-Z0-9][a-zA-Z0-9\-]*$").unwrap());
+
+// Nix store paths: /nix/store/<32-char-hash>-<name>
+static STORE_PATH_PATTERN: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^/nix/store/[a-z0-9]{32}-[a-zA-Z0-9._\-]+$").unwrap());
+
+// File paths: no shell metacharacters, reasonable characters
+static PATH_PATTERN: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^[a-zA-Z0-9._\-/~]+$").unwrap());
 
 pub fn validate_installable(installable: &str) -> Result<&str, ValidationError> {
     if !FLAKE_REF_PATTERN.is_match(installable) {
@@ -58,6 +79,34 @@ pub fn validate_args(args: &[String]) -> Result<(), ValidationError> {
     Ok(())
 }
 
+pub fn validate_cache_name(name: &str) -> Result<&str, ValidationError> {
+    if !CACHE_NAME_PATTERN.is_match(name) {
+        return Err(ValidationError::InvalidCacheName(name.to_string()));
+    }
+    Ok(name)
+}
+
+pub fn validate_store_path(path: &str) -> Result<&str, ValidationError> {
+    if !STORE_PATH_PATTERN.is_match(path) {
+        return Err(ValidationError::InvalidStorePath(path.to_string()));
+    }
+    Ok(path)
+}
+
+pub fn validate_store_paths(paths: &[String]) -> Result<(), ValidationError> {
+    for path in paths {
+        validate_store_path(path)?;
+    }
+    Ok(())
+}
+
+pub fn validate_path(path: &str) -> Result<&str, ValidationError> {
+    if !PATH_PATTERN.is_match(path) {
+        return Err(ValidationError::InvalidPath(path.to_string()));
+    }
+    Ok(path)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -83,5 +132,38 @@ mod tests {
         assert!(validate_no_shell_metacharacters("hello; rm -rf").is_err());
         assert!(validate_no_shell_metacharacters("$(cmd)").is_err());
         assert!(validate_no_shell_metacharacters("foo | bar").is_err());
+    }
+
+    #[test]
+    fn test_cache_name() {
+        assert!(validate_cache_name("mycache").is_ok());
+        assert!(validate_cache_name("my-cache").is_ok());
+        assert!(validate_cache_name("cache123").is_ok());
+        assert!(validate_cache_name("-invalid").is_err());
+        assert!(validate_cache_name("").is_err());
+        assert!(validate_cache_name("cache;injection").is_err());
+    }
+
+    #[test]
+    fn test_store_path() {
+        assert!(validate_store_path(
+            "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-hello"
+        )
+        .is_ok());
+        assert!(validate_store_path(
+            "/nix/store/abcdefghijklmnopqrstuvwxyz012345-package-1.0"
+        )
+        .is_ok());
+        assert!(validate_store_path("/tmp/not-store").is_err());
+        assert!(validate_store_path("/nix/store/short-hash").is_err());
+    }
+
+    #[test]
+    fn test_path() {
+        assert!(validate_path("/home/user/result").is_ok());
+        assert!(validate_path("./result").is_ok());
+        assert!(validate_path("~/project/result").is_ok());
+        assert!(validate_path("/path;injection").is_err());
+        assert!(validate_path("/path$(cmd)").is_err());
     }
 }

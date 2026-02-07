@@ -1,9 +1,9 @@
 use crate::nix_runner::run_fh_command;
 use crate::tools::{
-    FhAddParams, FhListFlakesParams, FhListReleasesParams, FhListVersionsParams, FhResolveParams,
-    FhSearchParams,
+    FhAddParams, FhFetchParams, FhListFlakesParams, FhListReleasesParams, FhListVersionsParams,
+    FhLoginParams, FhResolveParams, FhSearchParams,
 };
-use crate::validators::validate_no_shell_metacharacters;
+use crate::validators::{validate_no_shell_metacharacters, validate_path};
 use serde::Serialize;
 
 #[derive(Debug, Serialize)]
@@ -193,6 +193,95 @@ pub async fn fh_resolve(params: FhResolveParams) -> Result<FhResolveResult, Stri
     Ok(FhResolveResult {
         success: result.success,
         result: resolve_result,
+        stderr: result.stderr,
+    })
+}
+
+#[derive(Debug, Serialize)]
+pub struct FhStatusResult {
+    pub success: bool,
+    pub logged_in: bool,
+    pub stdout: String,
+    pub stderr: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct FhFetchResult {
+    pub success: bool,
+    pub store_path: Option<String>,
+    pub target_link: String,
+    pub stdout: String,
+    pub stderr: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct FhLoginResult {
+    pub success: bool,
+    pub message: String,
+    pub stderr: String,
+}
+
+pub async fn fh_status() -> Result<FhStatusResult, String> {
+    let args = vec!["status"];
+    let result = run_fh_command(&args).await.map_err(|e| e.to_string())?;
+
+    // Check if output indicates logged in status
+    let logged_in = result.success
+        && (result.stdout.contains("Logged in") || result.stdout.contains("authenticated"));
+
+    Ok(FhStatusResult {
+        success: result.success,
+        logged_in,
+        stdout: result.stdout,
+        stderr: result.stderr,
+    })
+}
+
+pub async fn fh_fetch(params: FhFetchParams) -> Result<FhFetchResult, String> {
+    validate_no_shell_metacharacters(&params.flake_ref).map_err(|e| e.to_string())?;
+    validate_path(&params.target_link).map_err(|e| e.to_string())?;
+
+    let args = vec!["fetch", &params.flake_ref, &params.target_link];
+    let result = run_fh_command(&args).await.map_err(|e| e.to_string())?;
+
+    // Extract store path from output if present
+    let store_path = result
+        .stdout
+        .lines()
+        .find(|line| line.starts_with("/nix/store/"))
+        .map(|s| s.to_string());
+
+    Ok(FhFetchResult {
+        success: result.success,
+        store_path,
+        target_link: params.target_link,
+        stdout: result.stdout,
+        stderr: result.stderr,
+    })
+}
+
+pub async fn fh_login(params: FhLoginParams) -> Result<FhLoginResult, String> {
+    let mut args = vec!["login"];
+
+    let token_file;
+    if let Some(ref path) = params.token_file {
+        validate_path(path).map_err(|e| e.to_string())?;
+        token_file = path.clone();
+        args.push("--token-file");
+        args.push(&token_file);
+    }
+
+    let result = run_fh_command(&args).await.map_err(|e| e.to_string())?;
+
+    let message = if result.success {
+        "Login initiated. Follow browser prompts to complete authentication.".to_string()
+    } else {
+        format!("Login failed: {}", result.stderr)
+    };
+
+    Ok(FhLoginResult {
+        success: result.success,
+        message,
         stderr: result.stderr,
     })
 }

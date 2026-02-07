@@ -103,3 +103,36 @@ pub async fn run_fh_command_with_timeout(
         Err(_) => Err(NixError::Timeout(timeout_secs)),
     }
 }
+
+pub async fn run_cachix_command(args: &[&str]) -> Result<NixOutput, NixError> {
+    run_cachix_command_with_env(args, &[], DEFAULT_TIMEOUT_SECS).await
+}
+
+pub async fn run_cachix_command_with_env(
+    args: &[&str],
+    env_vars: &[(&str, &str)],
+    timeout_secs: u64,
+) -> Result<NixOutput, NixError> {
+    let mut cmd = Command::new("cachix");
+    cmd.args(args);
+    cmd.kill_on_drop(true);
+
+    for (key, value) in env_vars {
+        cmd.env(key, value);
+    }
+
+    let result = timeout(Duration::from_secs(timeout_secs), cmd.output()).await;
+
+    match result {
+        Ok(output_result) => {
+            let output = output_result?;
+            Ok(NixOutput {
+                success: output.status.success(),
+                stdout: String::from_utf8_lossy(&output.stdout).to_string(),
+                stderr: String::from_utf8_lossy(&output.stderr).to_string(),
+                exit_code: output.status.code(),
+            })
+        }
+        Err(_) => Err(NixError::Timeout(timeout_secs)),
+    }
+}

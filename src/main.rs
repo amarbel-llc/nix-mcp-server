@@ -1,3 +1,5 @@
+mod background;
+mod config;
 mod nix_runner;
 mod server;
 mod tools;

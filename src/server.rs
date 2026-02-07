@@ -1,7 +1,9 @@
+use crate::background::{get_task_info, list_tasks};
 use crate::tools::{
-    self, FhAddParams, FhListFlakesParams, FhListReleasesParams, FhListVersionsParams,
-    FhResolveParams, FhSearchParams, NixBuildParams, NixDevelopRunParams, NixEvalParams,
-    NixFlakeCheckParams, NixFlakeShowParams, NixLogParams, NixRunParams,
+    self, CachixPushParams, CachixStatusParams, CachixUseParams, FhAddParams, FhFetchParams,
+    FhListFlakesParams, FhListReleasesParams, FhListVersionsParams, FhLoginParams, FhResolveParams,
+    FhSearchParams, NixBuildParams, NixDevelopRunParams, NixEvalParams, NixFlakeCheckParams,
+    NixFlakeShowParams, NixLogParams, NixRunParams, TaskStatusParams,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -322,6 +324,61 @@ impl Server {
                     serde_json::from_value(arguments).map_err(|e| e.to_string())?;
                 let result = tools::fh_resolve(params).await?;
                 serde_json::to_value(result).map_err(|e| e.to_string())
+            }
+            // Cachix tools
+            "cachix_push" => {
+                let params: CachixPushParams =
+                    serde_json::from_value(arguments).map_err(|e| e.to_string())?;
+                let result = tools::cachix_push(params.cache_name, params.store_paths).await?;
+                serde_json::to_value(result).map_err(|e| e.to_string())
+            }
+            "cachix_use" => {
+                let params: CachixUseParams =
+                    serde_json::from_value(arguments).map_err(|e| e.to_string())?;
+                let result = tools::cachix_use(params.cache_name).await?;
+                serde_json::to_value(result).map_err(|e| e.to_string())
+            }
+            "cachix_status" => {
+                let _params: CachixStatusParams =
+                    serde_json::from_value(arguments).unwrap_or_default();
+                let result = tools::cachix_status().await?;
+                serde_json::to_value(result).map_err(|e| e.to_string())
+            }
+            // FlakeHub cache tools
+            "fh_status" => {
+                let result = tools::fh_status().await?;
+                serde_json::to_value(result).map_err(|e| e.to_string())
+            }
+            "fh_fetch" => {
+                let params: FhFetchParams =
+                    serde_json::from_value(arguments).map_err(|e| e.to_string())?;
+                let result = tools::fh_fetch(params).await?;
+                serde_json::to_value(result).map_err(|e| e.to_string())
+            }
+            "fh_login" => {
+                let params: FhLoginParams =
+                    serde_json::from_value(arguments).unwrap_or_default();
+                let result = tools::fh_login(params).await?;
+                serde_json::to_value(result).map_err(|e| e.to_string())
+            }
+            // Background task tools
+            "task_status" => {
+                let params: TaskStatusParams =
+                    serde_json::from_value(arguments).unwrap_or_default();
+                let result = match params.task_id {
+                    Some(id) => {
+                        if let Some(info) = get_task_info(&id) {
+                            serde_json::json!({ "task": info })
+                        } else {
+                            serde_json::json!({ "error": format!("Task not found: {}", id) })
+                        }
+                    }
+                    None => {
+                        let tasks = list_tasks();
+                        serde_json::json!({ "tasks": tasks })
+                    }
+                };
+                Ok(result)
             }
             _ => Err(format!("Unknown tool: {}", name)),
         }

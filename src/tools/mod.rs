@@ -1,4 +1,5 @@
 mod build;
+mod cachix;
 mod eval;
 mod flake;
 mod flakehub;
@@ -6,10 +7,12 @@ mod log;
 mod run;
 
 pub use build::nix_build;
+pub use cachix::{cachix_push, cachix_status, cachix_use};
 pub use eval::nix_eval;
 pub use flake::{nix_flake_check, nix_flake_show};
 pub use flakehub::{
-    fh_add, fh_list_flakes, fh_list_releases, fh_list_versions, fh_resolve, fh_search,
+    fh_add, fh_fetch, fh_list_flakes, fh_list_releases, fh_list_versions, fh_login, fh_resolve,
+    fh_search, fh_status,
 };
 pub use log::nix_log;
 pub use run::{nix_develop_run, nix_run};
@@ -267,6 +270,102 @@ pub fn list_tools() -> Vec<ToolInfo> {
                 "required": ["flake_ref"]
             }),
         },
+        // Cachix tools
+        ToolInfo {
+            name: "cachix_push",
+            description: "Push store paths to a Cachix binary cache. Requires CACHIX_AUTH_TOKEN env var or config in ~/.config/nix-mcp-server/config.toml.",
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "cache_name": {
+                        "type": "string",
+                        "description": "Cachix cache name. Uses default from config if not specified."
+                    },
+                    "store_paths": {
+                        "type": "array",
+                        "items": { "type": "string" },
+                        "description": "Nix store paths to push (e.g., '/nix/store/...-hello')."
+                    }
+                },
+                "required": ["store_paths"]
+            }),
+        },
+        ToolInfo {
+            name: "cachix_use",
+            description: "Configure Nix to use a Cachix binary cache as a substituter.",
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "cache_name": {
+                        "type": "string",
+                        "description": "Cachix cache name to add as substituter."
+                    }
+                },
+                "required": ["cache_name"]
+            }),
+        },
+        ToolInfo {
+            name: "cachix_status",
+            description: "Check Cachix authentication status.",
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {}
+            }),
+        },
+        // FlakeHub cache tools
+        ToolInfo {
+            name: "fh_status",
+            description: "Check FlakeHub login and cache status.",
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {}
+            }),
+        },
+        ToolInfo {
+            name: "fh_fetch",
+            description: "Fetch a flake output from FlakeHub cache and create a GC root symlink.",
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "flake_ref": {
+                        "type": "string",
+                        "description": "FlakeHub flake reference (e.g., 'NixOS/nixpkgs/0.2411.*#hello')."
+                    },
+                    "target_link": {
+                        "type": "string",
+                        "description": "Path for the symlink (GC root)."
+                    }
+                },
+                "required": ["flake_ref", "target_link"]
+            }),
+        },
+        ToolInfo {
+            name: "fh_login",
+            description: "Initiate FlakeHub OAuth login flow. Opens browser for authentication.",
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "token_file": {
+                        "type": "string",
+                        "description": "Optional path to token file for non-interactive auth."
+                    }
+                }
+            }),
+        },
+        // Background task tools
+        ToolInfo {
+            name: "task_status",
+            description: "Check status of background tasks. If no task_id provided, lists all tasks.",
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "task_id": {
+                        "type": "string",
+                        "description": "Task ID to check. If omitted, returns all tasks."
+                    }
+                }
+            }),
+        },
     ]
 }
 
@@ -349,4 +448,40 @@ pub struct FhListVersionsParams {
 #[derive(Debug, Deserialize)]
 pub struct FhResolveParams {
     pub flake_ref: String,
+}
+
+// Cachix params
+#[derive(Debug, Deserialize, Default)]
+pub struct CachixPushParams {
+    pub cache_name: Option<String>,
+    pub store_paths: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CachixUseParams {
+    pub cache_name: String,
+}
+
+#[derive(Debug, Deserialize, Default)]
+pub struct CachixStatusParams {}
+
+// FlakeHub cache params
+#[derive(Debug, Deserialize, Default)]
+pub struct FhStatusParams {}
+
+#[derive(Debug, Deserialize)]
+pub struct FhFetchParams {
+    pub flake_ref: String,
+    pub target_link: String,
+}
+
+#[derive(Debug, Deserialize, Default)]
+pub struct FhLoginParams {
+    pub token_file: Option<String>,
+}
+
+// Background task params
+#[derive(Debug, Deserialize, Default)]
+pub struct TaskStatusParams {
+    pub task_id: Option<String>,
 }

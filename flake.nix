@@ -43,7 +43,7 @@
         } ''
           mkdir -p $out/bin
           makeWrapper ${nix-mcp-server-unwrapped}/bin/nix-mcp-server $out/bin/nix-mcp-server \
-            --prefix PATH : ${pkgs.lib.makeBinPath [ pkgs.nix fhPkg ]}
+            --prefix PATH : ${pkgs.lib.makeBinPath [ pkgs.nix fhPkg pkgs.cachix ]}
         '';
       in
       {
