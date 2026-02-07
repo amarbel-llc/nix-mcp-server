@@ -91,10 +91,10 @@ impl Server {
         Server {}
     }
 
-    pub async fn handle_request(&self, request: &str) -> JsonRpcResponse {
+    pub async fn handle_request(&self, request: &str) -> Value {
         let parsed: Result<JsonRpcRequest, _> = serde_json::from_str(request);
 
-        match parsed {
+        let response = match parsed {
             Ok(req) => self.dispatch(req).await,
             Err(e) => JsonRpcResponse {
                 jsonrpc: "2.0".to_string(),
@@ -106,7 +106,9 @@ impl Server {
                     data: None,
                 }),
             },
-        }
+        };
+
+        serde_json::to_value(response).unwrap_or(Value::Null)
     }
 
     async fn dispatch(&self, req: JsonRpcRequest) -> JsonRpcResponse {
