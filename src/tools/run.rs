@@ -12,7 +12,9 @@ pub struct NixRunResult {
 }
 
 pub async fn nix_run(params: NixRunParams) -> Result<NixRunResult, String> {
-    let installable = params.installable.unwrap_or_else(|| ".#default".to_string());
+    let installable = params
+        .installable
+        .unwrap_or_else(|| ".#default".to_string());
     validate_installable(&installable).map_err(|e| e.to_string())?;
 
     if let Some(ref args) = params.args {

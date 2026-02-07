@@ -11,7 +11,9 @@ pub struct NixBuildResult {
 }
 
 pub async fn nix_build(params: NixBuildParams) -> Result<NixBuildResult, String> {
-    let installable = params.installable.unwrap_or_else(|| ".#default".to_string());
+    let installable = params
+        .installable
+        .unwrap_or_else(|| ".#default".to_string());
     validate_installable(&installable).map_err(|e| e.to_string())?;
 
     let mut args = vec!["build", "--json", "--print-out-paths"];

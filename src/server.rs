@@ -1,6 +1,7 @@
 use crate::tools::{
-    self, NixBuildParams, NixDevelopRunParams, NixEvalParams, NixFlakeCheckParams,
-    NixFlakeShowParams, NixLogParams, NixRunParams,
+    self, FhAddParams, FhListFlakesParams, FhListReleasesParams, FhListVersionsParams,
+    FhResolveParams, FhSearchParams, NixBuildParams, NixDevelopRunParams, NixEvalParams,
+    NixFlakeCheckParams, NixFlakeShowParams, NixLogParams, NixRunParams,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -248,8 +249,7 @@ impl Server {
     async fn call_tool(&self, name: &str, arguments: Value) -> Result<Value, String> {
         match name {
             "nix_build" => {
-                let params: NixBuildParams =
-                    serde_json::from_value(arguments).unwrap_or_default();
+                let params: NixBuildParams = serde_json::from_value(arguments).unwrap_or_default();
                 let result = tools::nix_build(params).await?;
                 serde_json::to_value(result).map_err(|e| e.to_string())
             }
@@ -285,6 +285,42 @@ impl Server {
             "nix_eval" => {
                 let params: NixEvalParams = serde_json::from_value(arguments).unwrap_or_default();
                 let result = tools::nix_eval(params).await?;
+                serde_json::to_value(result).map_err(|e| e.to_string())
+            }
+            "fh_search" => {
+                let params: FhSearchParams =
+                    serde_json::from_value(arguments).map_err(|e| e.to_string())?;
+                let result = tools::fh_search(params).await?;
+                serde_json::to_value(result).map_err(|e| e.to_string())
+            }
+            "fh_add" => {
+                let params: FhAddParams =
+                    serde_json::from_value(arguments).map_err(|e| e.to_string())?;
+                let result = tools::fh_add(params).await?;
+                serde_json::to_value(result).map_err(|e| e.to_string())
+            }
+            "fh_list_flakes" => {
+                let params: FhListFlakesParams =
+                    serde_json::from_value(arguments).unwrap_or_default();
+                let result = tools::fh_list_flakes(params).await?;
+                serde_json::to_value(result).map_err(|e| e.to_string())
+            }
+            "fh_list_releases" => {
+                let params: FhListReleasesParams =
+                    serde_json::from_value(arguments).map_err(|e| e.to_string())?;
+                let result = tools::fh_list_releases(params).await?;
+                serde_json::to_value(result).map_err(|e| e.to_string())
+            }
+            "fh_list_versions" => {
+                let params: FhListVersionsParams =
+                    serde_json::from_value(arguments).map_err(|e| e.to_string())?;
+                let result = tools::fh_list_versions(params).await?;
+                serde_json::to_value(result).map_err(|e| e.to_string())
+            }
+            "fh_resolve" => {
+                let params: FhResolveParams =
+                    serde_json::from_value(arguments).map_err(|e| e.to_string())?;
+                let result = tools::fh_resolve(params).await?;
                 serde_json::to_value(result).map_err(|e| e.to_string())
             }
             _ => Err(format!("Unknown tool: {}", name)),
