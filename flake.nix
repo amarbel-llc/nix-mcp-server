@@ -38,12 +38,14 @@
 
         fhPkg = fh.packages.${system}.default;
 
+        # Note: We don't bundle nix itself - we use the system nix.
+        # This ensures compatibility with Determinate Nix settings like lazy-trees.
         nix-mcp-server = pkgs.runCommand "nix-mcp-server" {
           nativeBuildInputs = [ pkgs.makeWrapper ];
         } ''
           mkdir -p $out/bin
           makeWrapper ${nix-mcp-server-unwrapped}/bin/nix-mcp-server $out/bin/nix-mcp-server \
-            --prefix PATH : ${pkgs.lib.makeBinPath [ pkgs.nix fhPkg pkgs.cachix ]}
+            --prefix PATH : ${pkgs.lib.makeBinPath [ fhPkg pkgs.cachix ]}
         '';
       in
       {
