@@ -30,3 +30,7 @@ check:
 # Clean build artifacts
 clean:
     cargo clean
+
+# Install MCP server to Claude Code config
+install:
+    nix run .#install-mcp
