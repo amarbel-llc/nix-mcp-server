@@ -45,7 +45,7 @@
         } ''
           mkdir -p $out/bin
           makeWrapper ${nix-mcp-server-unwrapped}/bin/nix-mcp-server $out/bin/nix-mcp-server \
-            --prefix PATH : ${pkgs.lib.makeBinPath [ fhPkg pkgs.cachix ]}
+            --prefix PATH : ${pkgs.lib.makeBinPath [ fhPkg pkgs.cachix pkgs.nil ]}
         '';
       in
       {
@@ -60,6 +60,7 @@
             rust-analyzer
             cargo-watch
             fhPkg
+            nil
           ];
         };
 

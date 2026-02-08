@@ -1,5 +1,6 @@
 mod background;
 mod config;
+mod lsp_client;
 mod nix_runner;
 mod server;
 mod tools;

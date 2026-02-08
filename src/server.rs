@@ -2,7 +2,8 @@ use crate::background::{get_task_info, list_tasks};
 use crate::tools::{
     self, CachixPushParams, CachixStatusParams, CachixUseParams, FhAddParams, FhFetchParams,
     FhListFlakesParams, FhListReleasesParams, FhListVersionsParams, FhLoginParams, FhResolveParams,
-    FhSearchParams, NixBuildParams, NixDevelopRunParams, NixEvalParams, NixFlakeCheckParams,
+    FhSearchParams, NilCompletionsParams, NilDefinitionParams, NilDiagnosticsParams,
+    NilHoverParams, NixBuildParams, NixDevelopRunParams, NixEvalParams, NixFlakeCheckParams,
     NixFlakeShowParams, NixLogParams, NixRunParams, TaskStatusParams,
 };
 use serde::{Deserialize, Serialize};
@@ -379,6 +380,34 @@ impl Server {
                     }
                 };
                 Ok(result)
+            }
+            // nil LSP tools
+            "nil_diagnostics" => {
+                let params: NilDiagnosticsParams =
+                    serde_json::from_value(arguments).map_err(|e| e.to_string())?;
+                let result = tools::nil_diagnostics(params.file_path).await?;
+                serde_json::to_value(result).map_err(|e| e.to_string())
+            }
+            "nil_completions" => {
+                let params: NilCompletionsParams =
+                    serde_json::from_value(arguments).map_err(|e| e.to_string())?;
+                let result =
+                    tools::nil_completions(params.file_path, params.line, params.character).await?;
+                serde_json::to_value(result).map_err(|e| e.to_string())
+            }
+            "nil_hover" => {
+                let params: NilHoverParams =
+                    serde_json::from_value(arguments).map_err(|e| e.to_string())?;
+                let result =
+                    tools::nil_hover(params.file_path, params.line, params.character).await?;
+                serde_json::to_value(result).map_err(|e| e.to_string())
+            }
+            "nil_definition" => {
+                let params: NilDefinitionParams =
+                    serde_json::from_value(arguments).map_err(|e| e.to_string())?;
+                let result =
+                    tools::nil_definition(params.file_path, params.line, params.character).await?;
+                serde_json::to_value(result).map_err(|e| e.to_string())
             }
             _ => Err(format!("Unknown tool: {}", name)),
         }

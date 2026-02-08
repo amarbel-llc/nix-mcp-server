@@ -4,6 +4,7 @@ mod eval;
 mod flake;
 mod flakehub;
 mod log;
+mod lsp;
 mod run;
 
 pub use build::nix_build;
@@ -15,6 +16,7 @@ pub use flakehub::{
     fh_search, fh_status,
 };
 pub use log::nix_log;
+pub use lsp::{nil_completions, nil_definition, nil_diagnostics, nil_hover};
 pub use run::{nix_develop_run, nix_run};
 
 use serde::{Deserialize, Serialize};
@@ -366,6 +368,87 @@ pub fn list_tools() -> Vec<ToolInfo> {
                 }
             }),
         },
+        // nil LSP tools
+        ToolInfo {
+            name: "nil_diagnostics",
+            description: "Get Nix language diagnostics (errors, warnings, undefined names) for a file using the nil language server.",
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "file_path": {
+                        "type": "string",
+                        "description": "Absolute path to the .nix file to analyze."
+                    }
+                },
+                "required": ["file_path"]
+            }),
+        },
+        ToolInfo {
+            name: "nil_completions",
+            description: "Get Nix code completions at a specific position using the nil language server.",
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "file_path": {
+                        "type": "string",
+                        "description": "Absolute path to the .nix file."
+                    },
+                    "line": {
+                        "type": "integer",
+                        "description": "0-indexed line number."
+                    },
+                    "character": {
+                        "type": "integer",
+                        "description": "0-indexed character offset within the line."
+                    }
+                },
+                "required": ["file_path", "line", "character"]
+            }),
+        },
+        ToolInfo {
+            name: "nil_hover",
+            description: "Get hover information (documentation, type info) at a specific position using the nil language server.",
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "file_path": {
+                        "type": "string",
+                        "description": "Absolute path to the .nix file."
+                    },
+                    "line": {
+                        "type": "integer",
+                        "description": "0-indexed line number."
+                    },
+                    "character": {
+                        "type": "integer",
+                        "description": "0-indexed character offset within the line."
+                    }
+                },
+                "required": ["file_path", "line", "character"]
+            }),
+        },
+        ToolInfo {
+            name: "nil_definition",
+            description: "Go to definition for a symbol at a specific position using the nil language server.",
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "file_path": {
+                        "type": "string",
+                        "description": "Absolute path to the .nix file."
+                    },
+                    "line": {
+                        "type": "integer",
+                        "description": "0-indexed line number."
+                    },
+                    "character": {
+                        "type": "integer",
+                        "description": "0-indexed character offset within the line."
+                    }
+                },
+                "required": ["file_path", "line", "character"]
+            }),
+        },
     ]
 }
 
@@ -484,4 +567,31 @@ pub struct FhLoginParams {
 #[derive(Debug, Deserialize, Default)]
 pub struct TaskStatusParams {
     pub task_id: Option<String>,
+}
+
+// nil LSP params
+#[derive(Debug, Deserialize)]
+pub struct NilDiagnosticsParams {
+    pub file_path: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct NilCompletionsParams {
+    pub file_path: String,
+    pub line: u32,
+    pub character: u32,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct NilHoverParams {
+    pub file_path: String,
+    pub line: u32,
+    pub character: u32,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct NilDefinitionParams {
+    pub file_path: String,
+    pub line: u32,
+    pub character: u32,
 }
