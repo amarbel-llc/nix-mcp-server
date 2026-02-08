@@ -1,4 +1,5 @@
 use crate::nix_runner::run_nix_command;
+use crate::output::PaginationInfo;
 use crate::tools::{NixCopyParams, NixStoreGcParams, NixStorePathInfoParams};
 use crate::validators::{validate_flake_ref, validate_no_shell_metacharacters, validate_store_path};
 use serde::Serialize;
@@ -8,6 +9,8 @@ pub struct NixStorePathInfoResult {
     pub success: bool,
     pub path_info: serde_json::Value,
     pub stderr: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pagination: Option<PaginationInfo>,
 }
 
 pub async fn nix_store_path_info(
@@ -23,7 +26,8 @@ pub async fn nix_store_path_info(
         validate_flake_ref(path).map_err(|e| e.to_string())?;
     }
 
-    if params.closure.unwrap_or(false) {
+    let use_closure = params.closure.unwrap_or(false);
+    if use_closure {
         args.push("--closure");
     }
 
@@ -35,16 +39,56 @@ pub async fn nix_store_path_info(
 
     let result = run_nix_command(&args).await.map_err(|e| e.to_string())?;
 
-    let path_info = if result.success {
-        serde_json::from_str(&result.stdout).unwrap_or(serde_json::Value::Null)
+    if !result.success {
+        return Ok(NixStorePathInfoResult {
+            success: false,
+            path_info: serde_json::Value::Null,
+            stderr: result.stderr,
+            pagination: None,
+        });
+    }
+
+    let parsed: serde_json::Value =
+        serde_json::from_str(&result.stdout).unwrap_or(serde_json::Value::Null);
+
+    // Apply pagination if closure was requested and we have an array
+    let (path_info, pagination) = if use_closure {
+        if let serde_json::Value::Array(arr) = parsed {
+            let total = arr.len();
+            let offset = params.closure_offset.unwrap_or(0);
+            let limit = params.closure_limit.unwrap_or(total);
+
+            let paginated: Vec<serde_json::Value> =
+                arr.into_iter().skip(offset).take(limit).collect();
+
+            let kept_count = paginated.len();
+            let has_more = offset + kept_count < total;
+
+            let pagination_info =
+                if params.closure_limit.is_some() || params.closure_offset.is_some() {
+                    Some(PaginationInfo {
+                        offset,
+                        limit,
+                        total,
+                        has_more,
+                    })
+                } else {
+                    None
+                };
+
+            (serde_json::Value::Array(paginated), pagination_info)
+        } else {
+            (parsed, None)
+        }
     } else {
-        serde_json::Value::Null
+        (parsed, None)
     };
 
     Ok(NixStorePathInfoResult {
-        success: result.success,
+        success: true,
         path_info,
         stderr: result.stderr,
+        pagination,
     })
 }
 

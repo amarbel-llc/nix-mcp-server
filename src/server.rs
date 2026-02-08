@@ -1,4 +1,5 @@
 use crate::background::{get_task_info, list_tasks};
+use crate::resources::{self, ResourceReadParams};
 use crate::tools::{
     self, CachixPushParams, CachixStatusParams, CachixUseParams, FhAddParams, FhFetchParams,
     FhListFlakesParams, FhListReleasesParams, FhListVersionsParams, FhLoginParams, FhResolveParams,
@@ -56,10 +57,19 @@ struct InitializeResult {
 #[derive(Debug, Serialize)]
 struct Capabilities {
     tools: ToolsCapability,
+    resources: ResourcesCapability,
 }
 
 #[derive(Debug, Serialize)]
 struct ToolsCapability {
+    #[serde(rename = "listChanged")]
+    list_changed: bool,
+}
+
+#[derive(Debug, Serialize)]
+struct ResourcesCapability {
+    #[serde(rename = "subscribe")]
+    subscribe: bool,
     #[serde(rename = "listChanged")]
     list_changed: bool,
 }
@@ -82,6 +92,33 @@ struct ToolCallResult {
     content: Vec<ContentItem>,
     #[serde(rename = "isError", skip_serializing_if = "Option::is_none")]
     is_error: Option<bool>,
+}
+
+#[derive(Debug, Serialize)]
+struct ResourcesListResult {
+    resources: Vec<ResourceDefinition>,
+}
+
+#[derive(Debug, Serialize)]
+struct ResourceDefinition {
+    uri: String,
+    name: String,
+    description: String,
+    #[serde(rename = "mimeType")]
+    mime_type: String,
+}
+
+#[derive(Debug, Serialize)]
+struct ResourceReadResult {
+    contents: Vec<ResourceContentItem>,
+}
+
+#[derive(Debug, Serialize)]
+struct ResourceContentItem {
+    uri: String,
+    #[serde(rename = "mimeType")]
+    mime_type: String,
+    text: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -126,6 +163,8 @@ impl Server {
             "notifications/initialized" => return self.empty_response(id),
             "tools/list" => self.handle_tools_list().await,
             "tools/call" => self.handle_tool_call(req.params).await,
+            "resources/list" => self.handle_resources_list().await,
+            "resources/read" => self.handle_resources_read(req.params).await,
             _ => Err(JsonRpcError {
                 code: -32601,
                 message: format!("Method not found: {}", req.method),
@@ -163,6 +202,10 @@ impl Server {
             protocol_version: "2024-11-05".to_string(),
             capabilities: Capabilities {
                 tools: ToolsCapability {
+                    list_changed: false,
+                },
+                resources: ResourcesCapability {
+                    subscribe: false,
                     list_changed: false,
                 },
             },
@@ -480,5 +523,62 @@ impl Server {
             }
             _ => Err(format!("Unknown tool: {}", name)),
         }
+    }
+
+    async fn handle_resources_list(&self) -> Result<Value, JsonRpcError> {
+        let resource_infos = resources::list_resources();
+        let resources: Vec<ResourceDefinition> = resource_infos
+            .into_iter()
+            .map(|r| ResourceDefinition {
+                uri: r.uri,
+                name: r.name,
+                description: r.description,
+                mime_type: r.mime_type,
+            })
+            .collect();
+
+        let result = ResourcesListResult { resources };
+        serde_json::to_value(result).map_err(|e| JsonRpcError {
+            code: -32603,
+            message: e.to_string(),
+            data: None,
+        })
+    }
+
+    async fn handle_resources_read(&self, params: Option<Value>) -> Result<Value, JsonRpcError> {
+        let params = params.ok_or_else(|| JsonRpcError {
+            code: -32602,
+            message: "Missing params".to_string(),
+            data: None,
+        })?;
+
+        let read_params: ResourceReadParams =
+            serde_json::from_value(params).map_err(|e| JsonRpcError {
+                code: -32602,
+                message: format!("Invalid params: {}", e),
+                data: None,
+            })?;
+
+        let content = resources::read_resource(&read_params.uri)
+            .await
+            .map_err(|e| JsonRpcError {
+                code: -32603,
+                message: e,
+                data: None,
+            })?;
+
+        let result = ResourceReadResult {
+            contents: vec![ResourceContentItem {
+                uri: content.uri,
+                mime_type: content.mime_type,
+                text: content.text,
+            }],
+        };
+
+        serde_json::to_value(result).map_err(|e| JsonRpcError {
+            code: -32603,
+            message: e.to_string(),
+            data: None,
+        })
     }
 }

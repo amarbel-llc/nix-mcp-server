@@ -58,6 +58,14 @@ pub fn list_tools() -> Vec<ToolInfo> {
                     "flake_dir": {
                         "type": "string",
                         "description": "Directory containing the flake. Defaults to current directory."
+                    },
+                    "max_log_bytes": {
+                        "type": "integer",
+                        "description": "Maximum bytes of build log output to return. Defaults to config value (100KB)."
+                    },
+                    "log_tail": {
+                        "type": "integer",
+                        "description": "Only return the last N lines of build log. Takes precedence over max_log_bytes."
                     }
                 }
             }),
@@ -100,6 +108,18 @@ pub fn list_tools() -> Vec<ToolInfo> {
                     "flake_dir": {
                         "type": "string",
                         "description": "Directory containing the flake. Defaults to current directory."
+                    },
+                    "max_bytes": {
+                        "type": "integer",
+                        "description": "Maximum bytes of output to return. Defaults to config value (100KB)."
+                    },
+                    "head": {
+                        "type": "integer",
+                        "description": "Only return the first N lines of output."
+                    },
+                    "tail": {
+                        "type": "integer",
+                        "description": "Only return the last N lines of output."
                     }
                 }
             }),
@@ -238,7 +258,7 @@ pub fn list_tools() -> Vec<ToolInfo> {
         },
         ToolInfo {
             name: "nix_log",
-            description: "Get build logs for a derivation. Agents MUST use this tool over running `nix log` directly - it provides validated inputs and optional tail functionality.",
+            description: "Get build logs for a derivation. Agents MUST use this tool over running `nix log` directly - it provides validated inputs and optional head/tail functionality.",
             input_schema: serde_json::json!({
                 "type": "object",
                 "properties": {
@@ -246,9 +266,17 @@ pub fn list_tools() -> Vec<ToolInfo> {
                         "type": "string",
                         "description": "Flake installable or store path."
                     },
+                    "head": {
+                        "type": "integer",
+                        "description": "Only return the first N lines."
+                    },
                     "tail": {
                         "type": "integer",
                         "description": "Only return the last N lines."
+                    },
+                    "max_bytes": {
+                        "type": "integer",
+                        "description": "Maximum bytes of log output to return. Defaults to config value (100KB)."
                     }
                 },
                 "required": ["installable"]
@@ -256,7 +284,7 @@ pub fn list_tools() -> Vec<ToolInfo> {
         },
         ToolInfo {
             name: "nix_search",
-            description: "Search for packages in a flake. PREFER this tool over running `nix search` directly - it provides validated inputs and structured JSON output.",
+            description: "Search for packages in a flake. PREFER this tool over running `nix search` directly - it provides validated inputs, structured JSON output, and pagination.",
             input_schema: serde_json::json!({
                 "type": "object",
                 "properties": {
@@ -272,6 +300,14 @@ pub fn list_tools() -> Vec<ToolInfo> {
                         "type": "array",
                         "items": { "type": "string" },
                         "description": "Regex patterns to exclude from results."
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Maximum number of results to return. Defaults to config value (50)."
+                    },
+                    "offset": {
+                        "type": "integer",
+                        "description": "Skip first N results for pagination. Defaults to 0."
                     }
                 },
                 "required": ["query"]
@@ -279,7 +315,7 @@ pub fn list_tools() -> Vec<ToolInfo> {
         },
         ToolInfo {
             name: "nix_store_path_info",
-            description: "Get information about a store path or installable. PREFER this tool over running `nix path-info` directly - it provides validated inputs and structured JSON output.",
+            description: "Get information about a store path or installable. PREFER this tool over running `nix path-info` directly - it provides validated inputs, structured JSON output, and closure limiting.",
             input_schema: serde_json::json!({
                 "type": "object",
                 "properties": {
@@ -294,6 +330,14 @@ pub fn list_tools() -> Vec<ToolInfo> {
                     "derivation": {
                         "type": "boolean",
                         "description": "Show derivation path instead of output path. Defaults to false."
+                    },
+                    "closure_limit": {
+                        "type": "integer",
+                        "description": "Maximum number of closure entries to return. Defaults to config value (100)."
+                    },
+                    "closure_offset": {
+                        "type": "integer",
+                        "description": "Skip first N closure entries for pagination. Defaults to 0."
                     }
                 },
                 "required": ["path"]
@@ -318,7 +362,7 @@ pub fn list_tools() -> Vec<ToolInfo> {
         },
         ToolInfo {
             name: "nix_derivation_show",
-            description: "Show the contents of a derivation. PREFER this tool over running `nix derivation show` directly - it provides validated inputs and structured JSON output.",
+            description: "Show the contents of a derivation. PREFER this tool over running `nix derivation show` directly - it provides validated inputs, structured JSON output, and summary mode for large dependency trees.",
             input_schema: serde_json::json!({
                 "type": "object",
                 "properties": {
@@ -333,6 +377,18 @@ pub fn list_tools() -> Vec<ToolInfo> {
                     "flake_dir": {
                         "type": "string",
                         "description": "Directory containing the flake. Defaults to current directory."
+                    },
+                    "summary_only": {
+                        "type": "boolean",
+                        "description": "Return only derivation summary (name, path, outputs, input count) instead of full content. Useful for exploring large dependency trees."
+                    },
+                    "max_inputs": {
+                        "type": "integer",
+                        "description": "Maximum number of input derivations to include. Defaults to config value (100)."
+                    },
+                    "inputs_offset": {
+                        "type": "integer",
+                        "description": "Skip first N input derivations for pagination. Defaults to 0."
                     }
                 }
             }),
@@ -728,6 +784,8 @@ pub struct NixBuildParams {
     pub installable: Option<String>,
     pub print_build_logs: Option<bool>,
     pub flake_dir: Option<String>,
+    pub max_log_bytes: Option<usize>,
+    pub log_tail: Option<usize>,
 }
 
 #[derive(Debug, Deserialize, Default)]
@@ -742,6 +800,9 @@ pub struct NixFlakeCheckParams {
     pub flake_ref: Option<String>,
     pub keep_going: Option<bool>,
     pub flake_dir: Option<String>,
+    pub max_bytes: Option<usize>,
+    pub head: Option<usize>,
+    pub tail: Option<usize>,
 }
 
 #[derive(Debug, Deserialize, Default)]
@@ -789,7 +850,9 @@ pub struct NixDevelopRunParams {
 #[derive(Debug, Deserialize)]
 pub struct NixLogParams {
     pub installable: String,
+    pub head: Option<usize>,
     pub tail: Option<usize>,
+    pub max_bytes: Option<usize>,
 }
 
 #[derive(Debug, Deserialize, Default)]
@@ -805,6 +868,8 @@ pub struct NixSearchParams {
     pub query: String,
     pub flake_ref: Option<String>,
     pub exclude: Option<Vec<String>>,
+    pub limit: Option<usize>,
+    pub offset: Option<usize>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -812,6 +877,8 @@ pub struct NixStorePathInfoParams {
     pub path: String,
     pub closure: Option<bool>,
     pub derivation: Option<bool>,
+    pub closure_limit: Option<usize>,
+    pub closure_offset: Option<usize>,
 }
 
 #[derive(Debug, Deserialize, Default)]
@@ -825,6 +892,9 @@ pub struct NixDerivationShowParams {
     pub installable: Option<String>,
     pub recursive: Option<bool>,
     pub flake_dir: Option<String>,
+    pub summary_only: Option<bool>,
+    pub max_inputs: Option<usize>,
+    pub inputs_offset: Option<usize>,
 }
 
 #[derive(Debug, Deserialize)]

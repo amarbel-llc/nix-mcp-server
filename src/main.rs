@@ -2,6 +2,8 @@ mod background;
 mod config;
 mod lsp_client;
 mod nix_runner;
+mod output;
+mod resources;
 mod server;
 mod tools;
 mod validators;

@@ -1,4 +1,5 @@
 use crate::nix_runner::run_nix_command;
+use crate::output::{limit_text_output, OutputLimits, TruncationInfo};
 use crate::tools::NixLogParams;
 use crate::validators::validate_installable;
 use serde::Serialize;
@@ -8,6 +9,10 @@ pub struct NixLogResult {
     pub success: bool,
     pub log: String,
     pub stderr: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub truncated: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub truncation_info: Option<TruncationInfo>,
 }
 
 pub async fn nix_log(params: NixLogParams) -> Result<NixLogResult, String> {
@@ -17,24 +22,25 @@ pub async fn nix_log(params: NixLogParams) -> Result<NixLogResult, String> {
 
     let result = run_nix_command(&args).await.map_err(|e| e.to_string())?;
 
-    let log = if let Some(tail) = params.tail {
-        result
-            .stdout
-            .lines()
-            .rev()
-            .take(tail)
-            .collect::<Vec<_>>()
-            .into_iter()
-            .rev()
-            .collect::<Vec<_>>()
-            .join("\n")
-    } else {
-        result.stdout
+    // Apply output limits using the output module
+    let limits = OutputLimits {
+        head: params.head,
+        tail: params.tail,
+        max_bytes: params.max_bytes,
+        max_lines: None,
     };
+
+    let limited = limit_text_output(&result.stdout, &limits);
 
     Ok(NixLogResult {
         success: result.success,
-        log,
+        log: limited.content,
         stderr: result.stderr,
+        truncated: if limited.truncated {
+            Some(true)
+        } else {
+            None
+        },
+        truncation_info: limited.truncation_info,
     })
 }

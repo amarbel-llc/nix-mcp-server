@@ -4,12 +4,16 @@ use std::env;
 use std::fs;
 use std::path::PathBuf;
 
+use crate::output::OutputLimitsConfig;
+
 #[derive(Debug, Default, Deserialize)]
 pub struct Config {
     #[serde(default)]
     pub cachix: CachixConfig,
     #[serde(default)]
     pub flakehub: FlakehubConfig,
+    #[serde(default)]
+    pub output_limits: OutputLimitsConfig,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -84,6 +88,10 @@ pub fn get_default_cache(config: &Config) -> Option<String> {
     config.cachix.default_cache.clone()
 }
 
+pub fn get_output_limits_config(config: &Config) -> &OutputLimitsConfig {
+    &config.output_limits
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -142,5 +150,35 @@ auth_token = "specific-token"
             get_cachix_token(&config, None),
             Some("global-token".to_string())
         );
+    }
+
+    #[test]
+    fn test_output_limits_config() {
+        let toml_str = r#"
+[output_limits]
+default_max_bytes = 50000
+default_max_lines = 1000
+default_max_items = 50
+log_tail_default = 250
+search_limit_default = 25
+"#;
+        let config: Config = toml::from_str(toml_str).unwrap();
+
+        assert_eq!(config.output_limits.default_max_bytes(), 50000);
+        assert_eq!(config.output_limits.default_max_lines(), 1000);
+        assert_eq!(config.output_limits.default_max_items(), 50);
+        assert_eq!(config.output_limits.log_tail_default(), 250);
+        assert_eq!(config.output_limits.search_limit_default(), 25);
+    }
+
+    #[test]
+    fn test_output_limits_defaults() {
+        let config = Config::default();
+        // Should use hardcoded defaults when not specified
+        assert_eq!(config.output_limits.default_max_bytes(), 100_000);
+        assert_eq!(config.output_limits.default_max_lines(), 2000);
+        assert_eq!(config.output_limits.default_max_items(), 100);
+        assert_eq!(config.output_limits.log_tail_default(), 500);
+        assert_eq!(config.output_limits.search_limit_default(), 50);
     }
 }

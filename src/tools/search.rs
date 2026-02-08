@@ -1,4 +1,5 @@
 use crate::nix_runner::run_nix_command;
+use crate::output::PaginationInfo;
 use crate::tools::NixSearchParams;
 use crate::validators::{validate_flake_ref, validate_no_shell_metacharacters};
 use serde::Serialize;
@@ -8,6 +9,8 @@ pub struct NixSearchResult {
     pub success: bool,
     pub packages: serde_json::Value,
     pub stderr: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pagination: Option<PaginationInfo>,
 }
 
 pub async fn nix_search(params: NixSearchParams) -> Result<NixSearchResult, String> {
@@ -30,15 +33,50 @@ pub async fn nix_search(params: NixSearchParams) -> Result<NixSearchResult, Stri
 
     let result = run_nix_command(&args).await.map_err(|e| e.to_string())?;
 
-    let packages = if result.success {
-        serde_json::from_str(&result.stdout).unwrap_or(serde_json::Value::Null)
+    let (packages, pagination) = if result.success {
+        match serde_json::from_str::<serde_json::Value>(&result.stdout) {
+            Ok(serde_json::Value::Object(map)) => {
+                let total = map.len();
+                let offset = params.offset.unwrap_or(0);
+                let limit = params.limit.unwrap_or(total);
+
+                // Apply pagination by converting to sorted vec, slicing, then back to object
+                let mut entries: Vec<_> = map.into_iter().collect();
+                entries.sort_by(|a, b| a.0.cmp(&b.0)); // Sort by package name
+
+                let paginated: serde_json::Map<String, serde_json::Value> = entries
+                    .into_iter()
+                    .skip(offset)
+                    .take(limit)
+                    .collect();
+
+                let kept_count = paginated.len();
+                let has_more = offset + kept_count < total;
+
+                let pagination_info = if params.limit.is_some() || params.offset.is_some() {
+                    Some(PaginationInfo {
+                        offset,
+                        limit,
+                        total,
+                        has_more,
+                    })
+                } else {
+                    None
+                };
+
+                (serde_json::Value::Object(paginated), pagination_info)
+            }
+            Ok(other) => (other, None),
+            Err(_) => (serde_json::Value::Null, None),
+        }
     } else {
-        serde_json::Value::Null
+        (serde_json::Value::Null, None)
     };
 
     Ok(NixSearchResult {
         success: result.success,
         packages,
         stderr: result.stderr,
+        pagination,
     })
 }

@@ -1,4 +1,5 @@
 use crate::nix_runner::run_nix_command_in_dir;
+use crate::output::{limit_text_output, OutputLimits, TruncationInfo};
 use crate::tools::{
     NixFlakeCheckParams, NixFlakeInitParams, NixFlakeLockParams, NixFlakeMetadataParams,
     NixFlakeShowParams, NixFlakeUpdateParams,
@@ -52,6 +53,10 @@ pub struct NixFlakeCheckResult {
     pub success: bool,
     pub stdout: String,
     pub stderr: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub truncated: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub truncation_info: Option<TruncationInfo>,
 }
 
 pub async fn nix_flake_check(params: NixFlakeCheckParams) -> Result<NixFlakeCheckResult, String> {
@@ -75,10 +80,26 @@ pub async fn nix_flake_check(params: NixFlakeCheckParams) -> Result<NixFlakeChec
         .await
         .map_err(|e| e.to_string())?;
 
+    // Apply output limits to both stdout and stderr
+    let limits = OutputLimits {
+        head: params.head,
+        tail: params.tail,
+        max_bytes: params.max_bytes,
+        max_lines: None,
+    };
+
+    let limited_stdout = limit_text_output(&result.stdout, &limits);
+    let limited_stderr = limit_text_output(&result.stderr, &limits);
+
+    // Report truncation if either was truncated
+    let truncated = limited_stdout.truncated || limited_stderr.truncated;
+
     Ok(NixFlakeCheckResult {
         success: result.success,
-        stdout: result.stdout,
-        stderr: result.stderr,
+        stdout: limited_stdout.content,
+        stderr: limited_stderr.content,
+        truncated: if truncated { Some(true) } else { None },
+        truncation_info: limited_stderr.truncation_info.or(limited_stdout.truncation_info),
     })
 }
 
