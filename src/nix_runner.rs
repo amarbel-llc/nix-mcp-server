@@ -26,16 +26,35 @@ pub struct NixOutput {
 const DEFAULT_TIMEOUT_SECS: u64 = 300;
 
 pub async fn run_nix_command(args: &[&str]) -> Result<NixOutput, NixError> {
-    run_nix_command_with_timeout(args, DEFAULT_TIMEOUT_SECS).await
+    run_nix_command_with_options(args, None, DEFAULT_TIMEOUT_SECS).await
+}
+
+pub async fn run_nix_command_in_dir(
+    args: &[&str],
+    cwd: Option<&str>,
+) -> Result<NixOutput, NixError> {
+    run_nix_command_with_options(args, cwd, DEFAULT_TIMEOUT_SECS).await
 }
 
 pub async fn run_nix_command_with_timeout(
     args: &[&str],
     timeout_secs: u64,
 ) -> Result<NixOutput, NixError> {
+    run_nix_command_with_options(args, None, timeout_secs).await
+}
+
+pub async fn run_nix_command_with_options(
+    args: &[&str],
+    cwd: Option<&str>,
+    timeout_secs: u64,
+) -> Result<NixOutput, NixError> {
     let mut cmd = Command::new("nix");
     cmd.args(args);
     cmd.kill_on_drop(true);
+
+    if let Some(dir) = cwd {
+        cmd.current_dir(dir);
+    }
 
     let result = timeout(Duration::from_secs(timeout_secs), cmd.output()).await;
 
@@ -77,16 +96,32 @@ pub fn parse_json_store_paths(stdout: &str) -> Vec<String> {
 }
 
 pub async fn run_fh_command(args: &[&str]) -> Result<NixOutput, NixError> {
-    run_fh_command_with_timeout(args, DEFAULT_TIMEOUT_SECS).await
+    run_fh_command_with_options(args, None, DEFAULT_TIMEOUT_SECS).await
+}
+
+pub async fn run_fh_command_in_dir(args: &[&str], cwd: Option<&str>) -> Result<NixOutput, NixError> {
+    run_fh_command_with_options(args, cwd, DEFAULT_TIMEOUT_SECS).await
 }
 
 pub async fn run_fh_command_with_timeout(
     args: &[&str],
     timeout_secs: u64,
 ) -> Result<NixOutput, NixError> {
+    run_fh_command_with_options(args, None, timeout_secs).await
+}
+
+pub async fn run_fh_command_with_options(
+    args: &[&str],
+    cwd: Option<&str>,
+    timeout_secs: u64,
+) -> Result<NixOutput, NixError> {
     let mut cmd = Command::new("fh");
     cmd.args(args);
     cmd.kill_on_drop(true);
+
+    if let Some(dir) = cwd {
+        cmd.current_dir(dir);
+    }
 
     let result = timeout(Duration::from_secs(timeout_secs), cmd.output()).await;
 

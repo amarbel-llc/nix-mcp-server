@@ -75,6 +75,10 @@ pub fn list_tools() -> Vec<ToolInfo> {
                     "all_systems": {
                         "type": "boolean",
                         "description": "Show outputs for all systems. Defaults to false."
+                    },
+                    "flake_dir": {
+                        "type": "string",
+                        "description": "Directory containing the flake. Defaults to current directory."
                     }
                 }
             }),
@@ -92,6 +96,10 @@ pub fn list_tools() -> Vec<ToolInfo> {
                     "keep_going": {
                         "type": "boolean",
                         "description": "Continue on error. Defaults to true."
+                    },
+                    "flake_dir": {
+                        "type": "string",
+                        "description": "Directory containing the flake. Defaults to current directory."
                     }
                 }
             }),
@@ -105,6 +113,10 @@ pub fn list_tools() -> Vec<ToolInfo> {
                     "flake_ref": {
                         "type": "string",
                         "description": "Flake reference (e.g., '.', 'github:NixOS/nixpkgs'). Defaults to '.'."
+                    },
+                    "flake_dir": {
+                        "type": "string",
+                        "description": "Directory containing the flake. Defaults to current directory."
                     }
                 }
             }),
@@ -123,6 +135,10 @@ pub fn list_tools() -> Vec<ToolInfo> {
                         "type": "array",
                         "items": { "type": "string" },
                         "description": "Specific inputs to update. If empty, updates all inputs."
+                    },
+                    "flake_dir": {
+                        "type": "string",
+                        "description": "Directory containing the flake. Defaults to current directory."
                     }
                 }
             }),
@@ -146,19 +162,27 @@ pub fn list_tools() -> Vec<ToolInfo> {
                         "type": "object",
                         "additionalProperties": { "type": "string" },
                         "description": "Map of input names to flake references to override."
+                    },
+                    "flake_dir": {
+                        "type": "string",
+                        "description": "Directory containing the flake. Defaults to current directory."
                     }
                 }
             }),
         },
         ToolInfo {
             name: "nix_flake_init",
-            description: "Initialize a new flake in the current directory. PREFER this tool over running `nix flake init` directly - it provides validated inputs and proper error handling.",
+            description: "Initialize a new flake in the specified directory. PREFER this tool over running `nix flake init` directly - it provides validated inputs and proper error handling.",
             input_schema: serde_json::json!({
                 "type": "object",
                 "properties": {
                     "template": {
                         "type": "string",
                         "description": "Template flake reference (e.g., 'templates#rust'). If not specified, uses default template."
+                    },
+                    "flake_dir": {
+                        "type": "string",
+                        "description": "Directory to initialize the flake in. Defaults to current directory."
                     }
                 }
             }),
@@ -177,6 +201,10 @@ pub fn list_tools() -> Vec<ToolInfo> {
                         "type": "array",
                         "items": { "type": "string" },
                         "description": "Arguments to pass to the app."
+                    },
+                    "flake_dir": {
+                        "type": "string",
+                        "description": "Directory containing the flake. Defaults to current directory."
                     }
                 }
             }),
@@ -199,6 +227,10 @@ pub fn list_tools() -> Vec<ToolInfo> {
                         "type": "array",
                         "items": { "type": "string" },
                         "description": "Arguments to pass to the command."
+                    },
+                    "flake_dir": {
+                        "type": "string",
+                        "description": "Directory containing the flake. Defaults to current directory."
                     }
                 },
                 "required": ["command"]
@@ -297,6 +329,10 @@ pub fn list_tools() -> Vec<ToolInfo> {
                     "recursive": {
                         "type": "boolean",
                         "description": "Include derivations of dependencies. Defaults to false."
+                    },
+                    "flake_dir": {
+                        "type": "string",
+                        "description": "Directory containing the flake. Defaults to current directory."
                     }
                 }
             }),
@@ -392,6 +428,10 @@ pub fn list_tools() -> Vec<ToolInfo> {
                     "apply": {
                         "type": "string",
                         "description": "Function to apply to the result (e.g., 'builtins.attrNames')."
+                    },
+                    "flake_dir": {
+                        "type": "string",
+                        "description": "Directory containing the flake. Defaults to current directory."
                     }
                 }
             }),
@@ -694,23 +734,27 @@ pub struct NixBuildParams {
 pub struct NixFlakeShowParams {
     pub flake_ref: Option<String>,
     pub all_systems: Option<bool>,
+    pub flake_dir: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Default)]
 pub struct NixFlakeCheckParams {
     pub flake_ref: Option<String>,
     pub keep_going: Option<bool>,
+    pub flake_dir: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Default)]
 pub struct NixFlakeMetadataParams {
     pub flake_ref: Option<String>,
+    pub flake_dir: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Default)]
 pub struct NixFlakeUpdateParams {
     pub flake_ref: Option<String>,
     pub inputs: Option<Vec<String>>,
+    pub flake_dir: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Default)]
@@ -718,17 +762,20 @@ pub struct NixFlakeLockParams {
     pub flake_ref: Option<String>,
     pub update_inputs: Option<Vec<String>>,
     pub override_inputs: Option<std::collections::HashMap<String, String>>,
+    pub flake_dir: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Default)]
 pub struct NixFlakeInitParams {
     pub template: Option<String>,
+    pub flake_dir: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Default)]
 pub struct NixRunParams {
     pub installable: Option<String>,
     pub args: Option<Vec<String>>,
+    pub flake_dir: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -736,6 +783,7 @@ pub struct NixDevelopRunParams {
     pub flake_ref: Option<String>,
     pub command: String,
     pub args: Option<Vec<String>>,
+    pub flake_dir: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -749,6 +797,7 @@ pub struct NixEvalParams {
     pub installable: Option<String>,
     pub expr: Option<String>,
     pub apply: Option<String>,
+    pub flake_dir: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -775,6 +824,7 @@ pub struct NixStoreGcParams {
 pub struct NixDerivationShowParams {
     pub installable: Option<String>,
     pub recursive: Option<bool>,
+    pub flake_dir: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]

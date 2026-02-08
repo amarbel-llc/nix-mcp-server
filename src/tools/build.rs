@@ -1,6 +1,6 @@
-use crate::nix_runner::{parse_json_store_paths, parse_store_paths, run_nix_command};
+use crate::nix_runner::{parse_json_store_paths, parse_store_paths, run_nix_command_in_dir};
 use crate::tools::NixBuildParams;
-use crate::validators::validate_installable;
+use crate::validators::{validate_installable, validate_path};
 use serde::Serialize;
 
 #[derive(Debug, Serialize)]
@@ -16,6 +16,11 @@ pub async fn nix_build(params: NixBuildParams) -> Result<NixBuildResult, String>
         .unwrap_or_else(|| ".#default".to_string());
     validate_installable(&installable).map_err(|e| e.to_string())?;
 
+    let flake_dir = params.flake_dir.as_deref();
+    if let Some(dir) = flake_dir {
+        validate_path(dir).map_err(|e| e.to_string())?;
+    }
+
     let mut args = vec!["build", "--json", "--print-out-paths"];
 
     if params.print_build_logs.unwrap_or(true) {
@@ -24,7 +29,9 @@ pub async fn nix_build(params: NixBuildParams) -> Result<NixBuildResult, String>
 
     args.push(&installable);
 
-    let result = run_nix_command(&args).await.map_err(|e| e.to_string())?;
+    let result = run_nix_command_in_dir(&args, flake_dir)
+        .await
+        .map_err(|e| e.to_string())?;
 
     let mut store_paths = parse_json_store_paths(&result.stdout);
     if store_paths.is_empty() {

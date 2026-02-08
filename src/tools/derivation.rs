@@ -1,6 +1,6 @@
-use crate::nix_runner::run_nix_command;
+use crate::nix_runner::run_nix_command_in_dir;
 use crate::tools::NixDerivationShowParams;
-use crate::validators::{validate_flake_ref, validate_store_path};
+use crate::validators::{validate_flake_ref, validate_path, validate_store_path};
 use serde::Serialize;
 
 #[derive(Debug, Serialize)]
@@ -14,6 +14,11 @@ pub async fn nix_derivation_show(
     params: NixDerivationShowParams,
 ) -> Result<NixDerivationShowResult, String> {
     let installable = params.installable.unwrap_or_else(|| ".#default".to_string());
+
+    let flake_dir = params.flake_dir.as_deref();
+    if let Some(dir) = flake_dir {
+        validate_path(dir).map_err(|e| e.to_string())?;
+    }
 
     // Validate based on whether it's a store path or installable
     if installable.starts_with("/nix/store/") {
@@ -30,7 +35,9 @@ pub async fn nix_derivation_show(
 
     args.push(&installable);
 
-    let result = run_nix_command(&args).await.map_err(|e| e.to_string())?;
+    let result = run_nix_command_in_dir(&args, flake_dir)
+        .await
+        .map_err(|e| e.to_string())?;
 
     let derivation = if result.success {
         serde_json::from_str(&result.stdout).unwrap_or(serde_json::Value::Null)

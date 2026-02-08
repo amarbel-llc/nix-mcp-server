@@ -1,9 +1,9 @@
-use crate::nix_runner::run_nix_command;
+use crate::nix_runner::run_nix_command_in_dir;
 use crate::tools::{
     NixFlakeCheckParams, NixFlakeInitParams, NixFlakeLockParams, NixFlakeMetadataParams,
     NixFlakeShowParams, NixFlakeUpdateParams,
 };
-use crate::validators::{validate_args, validate_flake_ref};
+use crate::validators::{validate_args, validate_flake_ref, validate_path};
 use serde::Serialize;
 
 #[derive(Debug, Serialize)]
@@ -17,6 +17,11 @@ pub async fn nix_flake_show(params: NixFlakeShowParams) -> Result<NixFlakeShowRe
     let flake_ref = params.flake_ref.unwrap_or_else(|| ".".to_string());
     validate_flake_ref(&flake_ref).map_err(|e| e.to_string())?;
 
+    let flake_dir = params.flake_dir.as_deref();
+    if let Some(dir) = flake_dir {
+        validate_path(dir).map_err(|e| e.to_string())?;
+    }
+
     let mut args = vec!["flake", "show", "--json"];
 
     if params.all_systems.unwrap_or(false) {
@@ -25,7 +30,9 @@ pub async fn nix_flake_show(params: NixFlakeShowParams) -> Result<NixFlakeShowRe
 
     args.push(&flake_ref);
 
-    let result = run_nix_command(&args).await.map_err(|e| e.to_string())?;
+    let result = run_nix_command_in_dir(&args, flake_dir)
+        .await
+        .map_err(|e| e.to_string())?;
 
     let outputs = if result.success {
         serde_json::from_str(&result.stdout).unwrap_or(serde_json::Value::Null)
@@ -51,6 +58,11 @@ pub async fn nix_flake_check(params: NixFlakeCheckParams) -> Result<NixFlakeChec
     let flake_ref = params.flake_ref.unwrap_or_else(|| ".".to_string());
     validate_flake_ref(&flake_ref).map_err(|e| e.to_string())?;
 
+    let flake_dir = params.flake_dir.as_deref();
+    if let Some(dir) = flake_dir {
+        validate_path(dir).map_err(|e| e.to_string())?;
+    }
+
     let mut args = vec!["flake", "check"];
 
     if params.keep_going.unwrap_or(true) {
@@ -59,7 +71,9 @@ pub async fn nix_flake_check(params: NixFlakeCheckParams) -> Result<NixFlakeChec
 
     args.push(&flake_ref);
 
-    let result = run_nix_command(&args).await.map_err(|e| e.to_string())?;
+    let result = run_nix_command_in_dir(&args, flake_dir)
+        .await
+        .map_err(|e| e.to_string())?;
 
     Ok(NixFlakeCheckResult {
         success: result.success,
@@ -81,9 +95,16 @@ pub async fn nix_flake_metadata(
     let flake_ref = params.flake_ref.unwrap_or_else(|| ".".to_string());
     validate_flake_ref(&flake_ref).map_err(|e| e.to_string())?;
 
+    let flake_dir = params.flake_dir.as_deref();
+    if let Some(dir) = flake_dir {
+        validate_path(dir).map_err(|e| e.to_string())?;
+    }
+
     let args = vec!["flake", "metadata", "--json", &flake_ref];
 
-    let result = run_nix_command(&args).await.map_err(|e| e.to_string())?;
+    let result = run_nix_command_in_dir(&args, flake_dir)
+        .await
+        .map_err(|e| e.to_string())?;
 
     let metadata = if result.success {
         serde_json::from_str(&result.stdout).unwrap_or(serde_json::Value::Null)
@@ -109,6 +130,11 @@ pub async fn nix_flake_update(params: NixFlakeUpdateParams) -> Result<NixFlakeUp
     let flake_ref = params.flake_ref.unwrap_or_else(|| ".".to_string());
     validate_flake_ref(&flake_ref).map_err(|e| e.to_string())?;
 
+    let flake_dir = params.flake_dir.as_deref();
+    if let Some(dir) = flake_dir {
+        validate_path(dir).map_err(|e| e.to_string())?;
+    }
+
     let inputs = params.inputs.unwrap_or_default();
     validate_args(&inputs).map_err(|e| e.to_string())?;
 
@@ -123,7 +149,9 @@ pub async fn nix_flake_update(params: NixFlakeUpdateParams) -> Result<NixFlakeUp
     args.push("--flake");
     args.push(&flake_ref);
 
-    let result = run_nix_command(&args).await.map_err(|e| e.to_string())?;
+    let result = run_nix_command_in_dir(&args, flake_dir)
+        .await
+        .map_err(|e| e.to_string())?;
 
     Ok(NixFlakeUpdateResult {
         success: result.success,
@@ -142,6 +170,11 @@ pub struct NixFlakeLockResult {
 pub async fn nix_flake_lock(params: NixFlakeLockParams) -> Result<NixFlakeLockResult, String> {
     let flake_ref = params.flake_ref.unwrap_or_else(|| ".".to_string());
     validate_flake_ref(&flake_ref).map_err(|e| e.to_string())?;
+
+    let flake_dir = params.flake_dir.as_deref();
+    if let Some(dir) = flake_dir {
+        validate_path(dir).map_err(|e| e.to_string())?;
+    }
 
     let mut args = vec!["flake", "lock"];
 
@@ -168,7 +201,9 @@ pub async fn nix_flake_lock(params: NixFlakeLockParams) -> Result<NixFlakeLockRe
 
     args.push(&flake_ref);
 
-    let result = run_nix_command(&args).await.map_err(|e| e.to_string())?;
+    let result = run_nix_command_in_dir(&args, flake_dir)
+        .await
+        .map_err(|e| e.to_string())?;
 
     Ok(NixFlakeLockResult {
         success: result.success,
@@ -185,6 +220,11 @@ pub struct NixFlakeInitResult {
 }
 
 pub async fn nix_flake_init(params: NixFlakeInitParams) -> Result<NixFlakeInitResult, String> {
+    let flake_dir = params.flake_dir.as_deref();
+    if let Some(dir) = flake_dir {
+        validate_path(dir).map_err(|e| e.to_string())?;
+    }
+
     let mut args = vec!["flake", "init"];
 
     let template_ref;
@@ -195,7 +235,9 @@ pub async fn nix_flake_init(params: NixFlakeInitParams) -> Result<NixFlakeInitRe
         args.push(&template_ref);
     }
 
-    let result = run_nix_command(&args).await.map_err(|e| e.to_string())?;
+    let result = run_nix_command_in_dir(&args, flake_dir)
+        .await
+        .map_err(|e| e.to_string())?;
 
     Ok(NixFlakeInitResult {
         success: result.success,

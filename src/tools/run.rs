@@ -1,6 +1,6 @@
-use crate::nix_runner::run_nix_command;
+use crate::nix_runner::run_nix_command_in_dir;
 use crate::tools::{NixDevelopRunParams, NixRunParams};
-use crate::validators::{validate_args, validate_flake_ref, validate_installable};
+use crate::validators::{validate_args, validate_flake_ref, validate_installable, validate_path};
 use serde::Serialize;
 
 #[derive(Debug, Serialize)]
@@ -17,6 +17,11 @@ pub async fn nix_run(params: NixRunParams) -> Result<NixRunResult, String> {
         .unwrap_or_else(|| ".#default".to_string());
     validate_installable(&installable).map_err(|e| e.to_string())?;
 
+    let flake_dir = params.flake_dir.as_deref();
+    if let Some(dir) = flake_dir {
+        validate_path(dir).map_err(|e| e.to_string())?;
+    }
+
     if let Some(ref args) = params.args {
         validate_args(args).map_err(|e| e.to_string())?;
     }
@@ -31,7 +36,9 @@ pub async fn nix_run(params: NixRunParams) -> Result<NixRunResult, String> {
         }
     }
 
-    let result = run_nix_command(&args).await.map_err(|e| e.to_string())?;
+    let result = run_nix_command_in_dir(&args, flake_dir)
+        .await
+        .map_err(|e| e.to_string())?;
 
     Ok(NixRunResult {
         success: result.success,
@@ -45,6 +52,11 @@ pub async fn nix_develop_run(params: NixDevelopRunParams) -> Result<NixRunResult
     let flake_ref = params.flake_ref.unwrap_or_else(|| ".".to_string());
     validate_flake_ref(&flake_ref).map_err(|e| e.to_string())?;
 
+    let flake_dir = params.flake_dir.as_deref();
+    if let Some(dir) = flake_dir {
+        validate_path(dir).map_err(|e| e.to_string())?;
+    }
+
     if let Some(ref args) = params.args {
         validate_args(args).map_err(|e| e.to_string())?;
     }
@@ -56,7 +68,9 @@ pub async fn nix_develop_run(params: NixDevelopRunParams) -> Result<NixRunResult
         args.push(arg);
     }
 
-    let result = run_nix_command(&args).await.map_err(|e| e.to_string())?;
+    let result = run_nix_command_in_dir(&args, flake_dir)
+        .await
+        .map_err(|e| e.to_string())?;
 
     Ok(NixRunResult {
         success: result.success,
