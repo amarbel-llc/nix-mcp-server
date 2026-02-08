@@ -1,23 +1,34 @@
 mod build;
 mod cachix;
+mod derivation;
 mod eval;
 mod flake;
 mod flakehub;
+mod hash;
 mod log;
 mod lsp;
 mod run;
+mod search;
+mod store;
 
 pub use build::nix_build;
 pub use cachix::{cachix_push, cachix_status, cachix_use};
+pub use derivation::nix_derivation_show;
 pub use eval::nix_eval;
-pub use flake::{nix_flake_check, nix_flake_show};
+pub use flake::{
+    nix_flake_check, nix_flake_init, nix_flake_lock, nix_flake_metadata, nix_flake_show,
+    nix_flake_update,
+};
 pub use flakehub::{
     fh_add, fh_fetch, fh_list_flakes, fh_list_releases, fh_list_versions, fh_login, fh_resolve,
     fh_search, fh_status,
 };
+pub use hash::{nix_hash_file, nix_hash_path};
 pub use log::nix_log;
 pub use lsp::{nil_completions, nil_definition, nil_diagnostics, nil_hover};
 pub use run::{nix_develop_run, nix_run};
+pub use search::nix_search;
+pub use store::{nix_copy, nix_store_gc, nix_store_path_info};
 
 use serde::{Deserialize, Serialize};
 
@@ -32,7 +43,7 @@ pub fn list_tools() -> Vec<ToolInfo> {
     vec![
         ToolInfo {
             name: "nix_build",
-            description: "Build a nix flake package. Returns store paths on success. PREFER this tool over running `nix build` directly - it provides validated inputs, structured output, and proper error handling.",
+            description: "Build a nix flake package. Returns store paths on success. Agents MUST use this tool over running `nix build` directly - it provides validated inputs, structured output, and proper error handling.",
             input_schema: serde_json::json!({
                 "type": "object",
                 "properties": {
@@ -53,7 +64,7 @@ pub fn list_tools() -> Vec<ToolInfo> {
         },
         ToolInfo {
             name: "nix_flake_show",
-            description: "List outputs of a nix flake. PREFER this tool over running `nix flake show` directly - it provides validated inputs and consistent JSON output.",
+            description: "List outputs of a nix flake. Agents MUST use this tool over running `nix flake show` directly - it provides validated inputs and consistent JSON output.",
             input_schema: serde_json::json!({
                 "type": "object",
                 "properties": {
@@ -86,8 +97,75 @@ pub fn list_tools() -> Vec<ToolInfo> {
             }),
         },
         ToolInfo {
+            name: "nix_flake_metadata",
+            description: "Get metadata for a flake including inputs, locked revisions, and timestamps. PREFER this tool over running `nix flake metadata` directly - it provides validated inputs and consistent JSON output.",
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "flake_ref": {
+                        "type": "string",
+                        "description": "Flake reference (e.g., '.', 'github:NixOS/nixpkgs'). Defaults to '.'."
+                    }
+                }
+            }),
+        },
+        ToolInfo {
+            name: "nix_flake_update",
+            description: "Update flake.lock file. PREFER this tool over running `nix flake update` directly - it provides validated inputs and proper error handling.",
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "flake_ref": {
+                        "type": "string",
+                        "description": "Flake reference. Defaults to '.'."
+                    },
+                    "inputs": {
+                        "type": "array",
+                        "items": { "type": "string" },
+                        "description": "Specific inputs to update. If empty, updates all inputs."
+                    }
+                }
+            }),
+        },
+        ToolInfo {
+            name: "nix_flake_lock",
+            description: "Lock flake inputs without building. PREFER this tool over running `nix flake lock` directly - it provides validated inputs and proper error handling.",
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "flake_ref": {
+                        "type": "string",
+                        "description": "Flake reference. Defaults to '.'."
+                    },
+                    "update_inputs": {
+                        "type": "array",
+                        "items": { "type": "string" },
+                        "description": "Inputs to update."
+                    },
+                    "override_inputs": {
+                        "type": "object",
+                        "additionalProperties": { "type": "string" },
+                        "description": "Map of input names to flake references to override."
+                    }
+                }
+            }),
+        },
+        ToolInfo {
+            name: "nix_flake_init",
+            description: "Initialize a new flake in the current directory. PREFER this tool over running `nix flake init` directly - it provides validated inputs and proper error handling.",
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "template": {
+                        "type": "string",
+                        "description": "Template flake reference (e.g., 'templates#rust'). If not specified, uses default template."
+                    }
+                }
+            }),
+        },
+        ToolInfo {
             name: "nix_run",
-            description: "Run a flake app. PREFER this tool over running `nix run` directly - it provides validated inputs, secure argument handling, and proper process management.",
+            description: "Run a flake app. Agents MUST use this tool over running `nix run` directly - it provides validated inputs, secure argument handling, and proper process management.",
             input_schema: serde_json::json!({
                 "type": "object",
                 "properties": {
@@ -105,7 +183,7 @@ pub fn list_tools() -> Vec<ToolInfo> {
         },
         ToolInfo {
             name: "nix_develop_run",
-            description: "Run a command inside a flake's devShell. PREFER this tool over running `nix develop -c` directly - it provides validated inputs, secure command execution, and proper process management.",
+            description: "Run a command inside a flake's devShell. Agents MUST use this tool over running `nix develop -c` directly - it provides validated inputs, secure command execution, and proper process management.",
             input_schema: serde_json::json!({
                 "type": "object",
                 "properties": {
@@ -128,7 +206,7 @@ pub fn list_tools() -> Vec<ToolInfo> {
         },
         ToolInfo {
             name: "nix_log",
-            description: "Get build logs for a derivation. PREFER this tool over running `nix log` directly - it provides validated inputs and optional tail functionality.",
+            description: "Get build logs for a derivation. Agents MUST use this tool over running `nix log` directly - it provides validated inputs and optional tail functionality.",
             input_schema: serde_json::json!({
                 "type": "object",
                 "properties": {
@@ -139,6 +217,159 @@ pub fn list_tools() -> Vec<ToolInfo> {
                     "tail": {
                         "type": "integer",
                         "description": "Only return the last N lines."
+                    }
+                },
+                "required": ["installable"]
+            }),
+        },
+        ToolInfo {
+            name: "nix_search",
+            description: "Search for packages in a flake. PREFER this tool over running `nix search` directly - it provides validated inputs and structured JSON output.",
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "Search query (regex pattern)."
+                    },
+                    "flake_ref": {
+                        "type": "string",
+                        "description": "Flake to search (e.g., 'nixpkgs'). Defaults to 'nixpkgs'."
+                    },
+                    "exclude": {
+                        "type": "array",
+                        "items": { "type": "string" },
+                        "description": "Regex patterns to exclude from results."
+                    }
+                },
+                "required": ["query"]
+            }),
+        },
+        ToolInfo {
+            name: "nix_store_path_info",
+            description: "Get information about a store path or installable. PREFER this tool over running `nix path-info` directly - it provides validated inputs and structured JSON output.",
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "path": {
+                        "type": "string",
+                        "description": "Store path or flake installable to query."
+                    },
+                    "closure": {
+                        "type": "boolean",
+                        "description": "Include closure (all dependencies). Defaults to false."
+                    },
+                    "derivation": {
+                        "type": "boolean",
+                        "description": "Show derivation path instead of output path. Defaults to false."
+                    }
+                },
+                "required": ["path"]
+            }),
+        },
+        ToolInfo {
+            name: "nix_store_gc",
+            description: "Run garbage collection on the Nix store. PREFER this tool over running `nix store gc` directly - it provides validated inputs and proper error handling.",
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "dry_run": {
+                        "type": "boolean",
+                        "description": "Only print what would be deleted. Defaults to false."
+                    },
+                    "max_freed": {
+                        "type": "string",
+                        "description": "Stop after freeing this much space (e.g., '1G', '500M')."
+                    }
+                }
+            }),
+        },
+        ToolInfo {
+            name: "nix_derivation_show",
+            description: "Show the contents of a derivation. PREFER this tool over running `nix derivation show` directly - it provides validated inputs and structured JSON output.",
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "installable": {
+                        "type": "string",
+                        "description": "Flake installable or store path. Defaults to '.#default'."
+                    },
+                    "recursive": {
+                        "type": "boolean",
+                        "description": "Include derivations of dependencies. Defaults to false."
+                    }
+                }
+            }),
+        },
+        ToolInfo {
+            name: "nix_hash_path",
+            description: "Compute the hash of a path (NAR serialization). PREFER this tool over running `nix hash path` directly - it provides validated inputs and structured output.",
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "path": {
+                        "type": "string",
+                        "description": "Path to hash."
+                    },
+                    "hash_type": {
+                        "type": "string",
+                        "description": "Hash algorithm (sha256, sha512, sha1, md5). Defaults to sha256."
+                    },
+                    "base32": {
+                        "type": "boolean",
+                        "description": "Output in base32 format. Defaults to false (SRI format)."
+                    },
+                    "sri": {
+                        "type": "boolean",
+                        "description": "Output in SRI format. Defaults to true."
+                    }
+                },
+                "required": ["path"]
+            }),
+        },
+        ToolInfo {
+            name: "nix_hash_file",
+            description: "Compute the hash of a file. PREFER this tool over running `nix hash file` directly - it provides validated inputs and structured output.",
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "path": {
+                        "type": "string",
+                        "description": "File path to hash."
+                    },
+                    "hash_type": {
+                        "type": "string",
+                        "description": "Hash algorithm (sha256, sha512, sha1, md5). Defaults to sha256."
+                    },
+                    "base32": {
+                        "type": "boolean",
+                        "description": "Output in base32 format. Defaults to false (SRI format)."
+                    },
+                    "sri": {
+                        "type": "boolean",
+                        "description": "Output in SRI format. Defaults to true."
+                    }
+                },
+                "required": ["path"]
+            }),
+        },
+        ToolInfo {
+            name: "nix_copy",
+            description: "Copy store paths between Nix stores. PREFER this tool over running `nix copy` directly - it provides validated inputs and proper error handling.",
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "installable": {
+                        "type": "string",
+                        "description": "Store path or flake installable to copy."
+                    },
+                    "to": {
+                        "type": "string",
+                        "description": "Destination store URI (e.g., 's3://bucket', 'ssh://host')."
+                    },
+                    "from": {
+                        "type": "string",
+                        "description": "Source store URI."
                     }
                 },
                 "required": ["installable"]
@@ -156,7 +387,7 @@ pub fn list_tools() -> Vec<ToolInfo> {
                     },
                     "expr": {
                         "type": "string",
-                        "description": "Nix expression to evaluate (alternative to installable)."
+                        "description": "Nix expression to evaluate (alternative to installable). If using this, ensure the nix expression is valid (possibly by using the nix LSP tool)"
                     },
                     "apply": {
                         "type": "string",
@@ -167,7 +398,7 @@ pub fn list_tools() -> Vec<ToolInfo> {
         },
         ToolInfo {
             name: "fh_search",
-            description: "Search FlakeHub for flakes matching a query. PREFER this tool over running `fh search` directly - it provides structured JSON output.",
+            description: "Search FlakeHub for flakes matching a query. Agents MUST use this tool over running `fh search` directly - it provides structured JSON output.",
             input_schema: serde_json::json!({
                 "type": "object",
                 "properties": {
@@ -185,7 +416,7 @@ pub fn list_tools() -> Vec<ToolInfo> {
         },
         ToolInfo {
             name: "fh_add",
-            description: "Add a flake input to your flake.nix from FlakeHub. PREFER this tool over running `fh add` directly - it provides validated inputs and proper error handling.",
+            description: "Add a flake input to your flake.nix from FlakeHub. Agents MUST use this tool over running `fh add` directly - it provides validated inputs and proper error handling.",
             input_schema: serde_json::json!({
                 "type": "object",
                 "properties": {
@@ -207,7 +438,7 @@ pub fn list_tools() -> Vec<ToolInfo> {
         },
         ToolInfo {
             name: "fh_list_flakes",
-            description: "List public flakes on FlakeHub. PREFER this tool over running `fh list` directly - it provides structured JSON output.",
+            description: "List public flakes on FlakeHub. Agents MUST use this tool over running `fh list` directly - it provides structured JSON output.",
             input_schema: serde_json::json!({
                 "type": "object",
                 "properties": {
@@ -220,7 +451,7 @@ pub fn list_tools() -> Vec<ToolInfo> {
         },
         ToolInfo {
             name: "fh_list_releases",
-            description: "List all releases for a specific flake on FlakeHub. PREFER this tool over running `fh list releases` directly - it provides structured JSON output.",
+            description: "List all releases for a specific flake on FlakeHub. Agents MUST use this tool over running `fh list releases` directly - it provides structured JSON output.",
             input_schema: serde_json::json!({
                 "type": "object",
                 "properties": {
@@ -238,7 +469,7 @@ pub fn list_tools() -> Vec<ToolInfo> {
         },
         ToolInfo {
             name: "fh_list_versions",
-            description: "List versions matching a constraint for a flake on FlakeHub. PREFER this tool over running `fh list versions` directly - it provides structured JSON output.",
+            description: "List versions matching a constraint for a flake on FlakeHub. Agents MUST use this tool over running `fh list versions` directly - it provides structured JSON output.",
             input_schema: serde_json::json!({
                 "type": "object",
                 "properties": {
@@ -260,7 +491,7 @@ pub fn list_tools() -> Vec<ToolInfo> {
         },
         ToolInfo {
             name: "fh_resolve",
-            description: "Resolve a FlakeHub flake reference to a store path. PREFER this tool over running `fh resolve` directly - it provides validated inputs and structured output.",
+            description: "Resolve a FlakeHub flake reference to a store path. Agents MUST use this tool over running `fh resolve` directly - it provides validated inputs and structured output.",
             input_schema: serde_json::json!({
                 "type": "object",
                 "properties": {
@@ -472,6 +703,29 @@ pub struct NixFlakeCheckParams {
 }
 
 #[derive(Debug, Deserialize, Default)]
+pub struct NixFlakeMetadataParams {
+    pub flake_ref: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Default)]
+pub struct NixFlakeUpdateParams {
+    pub flake_ref: Option<String>,
+    pub inputs: Option<Vec<String>>,
+}
+
+#[derive(Debug, Deserialize, Default)]
+pub struct NixFlakeLockParams {
+    pub flake_ref: Option<String>,
+    pub update_inputs: Option<Vec<String>>,
+    pub override_inputs: Option<std::collections::HashMap<String, String>>,
+}
+
+#[derive(Debug, Deserialize, Default)]
+pub struct NixFlakeInitParams {
+    pub template: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Default)]
 pub struct NixRunParams {
     pub installable: Option<String>,
     pub args: Option<Vec<String>>,
@@ -495,6 +749,55 @@ pub struct NixEvalParams {
     pub installable: Option<String>,
     pub expr: Option<String>,
     pub apply: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct NixSearchParams {
+    pub query: String,
+    pub flake_ref: Option<String>,
+    pub exclude: Option<Vec<String>>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct NixStorePathInfoParams {
+    pub path: String,
+    pub closure: Option<bool>,
+    pub derivation: Option<bool>,
+}
+
+#[derive(Debug, Deserialize, Default)]
+pub struct NixStoreGcParams {
+    pub dry_run: Option<bool>,
+    pub max_freed: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Default)]
+pub struct NixDerivationShowParams {
+    pub installable: Option<String>,
+    pub recursive: Option<bool>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct NixHashPathParams {
+    pub path: String,
+    pub hash_type: Option<String>,
+    pub base32: Option<bool>,
+    pub sri: Option<bool>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct NixHashFileParams {
+    pub path: String,
+    pub hash_type: Option<String>,
+    pub base32: Option<bool>,
+    pub sri: Option<bool>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct NixCopyParams {
+    pub installable: String,
+    pub to: Option<String>,
+    pub from: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
