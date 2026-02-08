@@ -85,39 +85,6 @@
             pkgs.nil
           ];
         });
-
-        apps.install-mcp = {
-          type = "app";
-          program = toString (
-            pkgs.writeShellScript "install-nix-mcp" ''
-              set -euo pipefail
-
-              log() {
-                ${pkgs.gum}/bin/gum style --foreground 212 "$1"
-              }
-
-              log_success() {
-                ${pkgs.gum}/bin/gum style --foreground 82 "✓ $1"
-              }
-
-              # Build the flake reference
-              FLAKE_REF="${self}"
-
-              # Remove existing nix MCP server if present (ignore failure)
-              log "Removing existing nix MCP server (if any)..."
-              claude mcp remove nix 2>/dev/null || true
-
-              # Add the nix MCP server
-              log "Adding nix MCP server..."
-              claude mcp add nix -- nix run "$FLAKE_REF"
-
-              log_success "Installation complete!"
-              log ""
-              log "The nix MCP server will be available in Claude Code."
-              log "To verify, run: claude mcp list"
-            ''
-          );
-        };
       }
     );
 }
