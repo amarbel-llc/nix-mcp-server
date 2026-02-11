@@ -11,7 +11,7 @@
     };
     crane.url = "github:ipetkov/crane";
     fh.url = "https://flakehub.com/f/DeterminateSystems/fh/*.tar.gz";
-    devenv-rust.url = "github:friedenberg/eng?dir=pkgs/alfa/devenv-rust";
+    rust.url = "github:friedenberg/eng?dir=devenvs/rust";
   };
 
   outputs =
@@ -22,7 +22,7 @@
       rust-overlay,
       crane,
       fh,
-      devenv-rust, nixpkgs-master,
+      rust, nixpkgs-master,
     }:
     utils.lib.eachDefaultSystem (
       system:
@@ -79,7 +79,7 @@
           unwrapped = nix-mcp-server-unwrapped;
         };
 
-        devShells.default = devenv-rust.devShells.${system}.default.overrideAttrs (oldAttrs: {
+        devShells.default = rust.devShells.${system}.default.overrideAttrs (oldAttrs: {
           nativeBuildInputs = (oldAttrs.nativeBuildInputs or [ ]) ++ [
             fhPkg
             pkgs.nil
