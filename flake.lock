@@ -167,11 +167,11 @@
       },
       "locked": {
         "dir": "devenvs/rust",
-        "lastModified": 1770817635,
-        "narHash": "sha256-V4X32boiQQW42rRR9bh1RuO6/JQF9nn2VlyXJT1tCzs=",
+        "lastModified": 1771096096,
+        "narHash": "sha256-eAeiDTopgfRmMC93ZtvdwYPtNVEh2694qIk1Ap2qem0=",
         "owner": "friedenberg",
         "repo": "eng",
-        "rev": "d6b1afb577ec35deca1cdc5be6a1776a3639df27",
+        "rev": "732621d021e7587aa3a6ba96b96b6af116df1b27",
         "type": "github"
       },
       "original": {

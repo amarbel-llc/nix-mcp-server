@@ -19,6 +19,9 @@ pub enum ValidationError {
     #[error("invalid store path: {0}")]
     InvalidStorePath(String),
 
+    #[error("invalid store subpath: {0}")]
+    InvalidStoreSubpath(String),
+
     #[error("invalid path: {0}")]
     InvalidPath(String),
 }
@@ -39,6 +42,13 @@ static CACHE_NAME_PATTERN: LazyLock<Regex> =
 // Nix store paths: /nix/store/<32-char-hash>-<name>
 static STORE_PATH_PATTERN: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"^/nix/store/[a-z0-9]{32}-[a-zA-Z0-9._\-]+$").unwrap());
+
+// Nix store subpaths: /nix/store/<32-char-hash>-<name>[/<sub-path>]
+// Each path component must contain at least one non-dot character to reject . and ..
+static STORE_SUBPATH_PATTERN: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"^/nix/store/[a-z0-9]{32}-[a-zA-Z0-9._\-]+(/[a-zA-Z0-9_\-][a-zA-Z0-9._\-]*)*$")
+        .unwrap()
+});
 
 // File paths: no shell metacharacters, reasonable characters
 static PATH_PATTERN: LazyLock<Regex> =
@@ -89,6 +99,13 @@ pub fn validate_cache_name(name: &str) -> Result<&str, ValidationError> {
 pub fn validate_store_path(path: &str) -> Result<&str, ValidationError> {
     if !STORE_PATH_PATTERN.is_match(path) {
         return Err(ValidationError::InvalidStorePath(path.to_string()));
+    }
+    Ok(path)
+}
+
+pub fn validate_store_subpath(path: &str) -> Result<&str, ValidationError> {
+    if !STORE_SUBPATH_PATTERN.is_match(path) {
+        return Err(ValidationError::InvalidStoreSubpath(path.to_string()));
     }
     Ok(path)
 }
@@ -156,6 +173,31 @@ mod tests {
         .is_ok());
         assert!(validate_store_path("/tmp/not-store").is_err());
         assert!(validate_store_path("/nix/store/short-hash").is_err());
+    }
+
+    #[test]
+    fn test_store_subpath() {
+        assert!(validate_store_subpath(
+            "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-hello"
+        )
+        .is_ok());
+        assert!(validate_store_subpath(
+            "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-hello/bin/hello"
+        )
+        .is_ok());
+        assert!(validate_store_subpath(
+            "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-package-1.0/share/doc"
+        )
+        .is_ok());
+        assert!(validate_store_subpath("/tmp/not-store").is_err());
+        assert!(validate_store_subpath(
+            "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-hello/../../etc/passwd"
+        )
+        .is_err());
+        assert!(validate_store_subpath(
+            "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-hello/bin;whoami"
+        )
+        .is_err());
     }
 
     #[test]

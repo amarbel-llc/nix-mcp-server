@@ -7,8 +7,8 @@ use crate::tools::{
     NilHoverParams, NixBuildParams, NixCopyParams, NixDerivationShowParams, NixDevelopRunParams,
     NixEvalParams, NixFlakeCheckParams, NixFlakeInitParams, NixFlakeLockParams,
     NixFlakeMetadataParams, NixFlakeShowParams, NixFlakeUpdateParams, NixHashFileParams,
-    NixHashPathParams, NixLogParams, NixRunParams, NixSearchParams, NixStoreGcParams,
-    NixStorePathInfoParams, TaskStatusParams,
+    NixHashPathParams, NixLogParams, NixRunParams, NixSearchParams, NixStoreCatParams,
+    NixStoreGcParams, NixStoreLsParams, NixStorePathInfoParams, TaskStatusParams,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -376,6 +376,18 @@ impl Server {
                 let params: NixStoreGcParams =
                     serde_json::from_value(arguments).unwrap_or_default();
                 let result = tools::nix_store_gc(params).await?;
+                serde_json::to_value(result).map_err(|e| e.to_string())
+            }
+            "nix_store_ls" => {
+                let params: NixStoreLsParams =
+                    serde_json::from_value(arguments).map_err(|e| e.to_string())?;
+                let result = tools::nix_store_ls(params).await?;
+                serde_json::to_value(result).map_err(|e| e.to_string())
+            }
+            "nix_store_cat" => {
+                let params: NixStoreCatParams =
+                    serde_json::from_value(arguments).map_err(|e| e.to_string())?;
+                let result = tools::nix_store_cat(params).await?;
                 serde_json::to_value(result).map_err(|e| e.to_string())
             }
             "nix_derivation_show" => {

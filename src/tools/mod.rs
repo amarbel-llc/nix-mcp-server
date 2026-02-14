@@ -28,7 +28,7 @@ pub use log::nix_log;
 pub use lsp::{nil_completions, nil_definition, nil_diagnostics, nil_hover};
 pub use run::{nix_develop_run, nix_run};
 pub use search::nix_search;
-pub use store::{nix_copy, nix_store_gc, nix_store_path_info};
+pub use store::{nix_copy, nix_store_cat, nix_store_gc, nix_store_ls, nix_store_path_info};
 
 use serde::{Deserialize, Serialize};
 
@@ -358,6 +358,46 @@ pub fn list_tools() -> Vec<ToolInfo> {
                         "description": "Stop after freeing this much space (e.g., '1G', '500M')."
                     }
                 }
+            }),
+        },
+        ToolInfo {
+            name: "nix_store_ls",
+            description: "List directory contents of a path that resolves into /nix/store/. Accepts ./result, ./result/bin, /nix/store/..., etc. Resolves symlinks and validates the canonical path is within the Nix store.",
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "path": {
+                        "type": "string",
+                        "description": "Path to list (e.g., './result', './result/bin', '/nix/store/...-name/bin'). Symlinks are resolved before validation."
+                    },
+                    "long": {
+                        "type": "boolean",
+                        "description": "Include file sizes for regular files. Defaults to false."
+                    }
+                },
+                "required": ["path"]
+            }),
+        },
+        ToolInfo {
+            name: "nix_store_cat",
+            description: "Read file contents from a path that resolves into /nix/store/. Accepts ./result, /nix/store/..., etc. Supports line-based pagination with offset and limit. Resolves symlinks and validates the canonical path is within the Nix store.",
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "path": {
+                        "type": "string",
+                        "description": "Path to the file to read (e.g., './result/bin/hello', '/nix/store/...-name/etc/config'). Symlinks are resolved before validation."
+                    },
+                    "offset": {
+                        "type": "integer",
+                        "description": "Number of lines to skip from the beginning. Defaults to 0."
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Maximum number of lines to return. Defaults to all lines."
+                    }
+                },
+                "required": ["path"]
             }),
         },
         ToolInfo {
@@ -885,6 +925,19 @@ pub struct NixStorePathInfoParams {
 pub struct NixStoreGcParams {
     pub dry_run: Option<bool>,
     pub max_freed: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct NixStoreLsParams {
+    pub path: String,
+    pub long: Option<bool>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct NixStoreCatParams {
+    pub path: String,
+    pub offset: Option<usize>,
+    pub limit: Option<usize>,
 }
 
 #[derive(Debug, Deserialize, Default)]

@@ -1,7 +1,7 @@
 use crate::nix_runner::run_nix_command;
 use crate::output::PaginationInfo;
-use crate::tools::{NixCopyParams, NixStoreGcParams, NixStorePathInfoParams};
-use crate::validators::{validate_flake_ref, validate_no_shell_metacharacters, validate_store_path};
+use crate::tools::{NixCopyParams, NixStoreCatParams, NixStoreLsParams, NixStoreGcParams, NixStorePathInfoParams};
+use crate::validators::{validate_flake_ref, validate_no_shell_metacharacters, validate_store_path, validate_store_subpath};
 use serde::Serialize;
 
 #[derive(Debug, Serialize)]
@@ -165,5 +165,133 @@ pub async fn nix_copy(params: NixCopyParams) -> Result<NixCopyResult, String> {
         success: result.success,
         stdout: result.stdout,
         stderr: result.stderr,
+    })
+}
+
+async fn resolve_and_validate_store_path(path: &str) -> Result<std::path::PathBuf, String> {
+    let canonical = tokio::fs::canonicalize(path)
+        .await
+        .map_err(|e| format!("Failed to resolve path '{}': {}", path, e))?;
+
+    let canonical_str = canonical
+        .to_str()
+        .ok_or_else(|| "Path contains invalid UTF-8".to_string())?;
+
+    validate_store_subpath(canonical_str).map_err(|e| e.to_string())?;
+
+    Ok(canonical)
+}
+
+#[derive(Debug, Serialize)]
+pub struct NixStoreLsEntry {
+    pub name: String,
+    pub entry_type: String,
+    pub size: Option<u64>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct NixStoreLsResult {
+    pub path: String,
+    pub entries: Vec<NixStoreLsEntry>,
+}
+
+pub async fn nix_store_ls(params: NixStoreLsParams) -> Result<NixStoreLsResult, String> {
+    let canonical = resolve_and_validate_store_path(&params.path).await?;
+    let long = params.long.unwrap_or(false);
+
+    let mut entries = Vec::new();
+    let mut read_dir = tokio::fs::read_dir(&canonical)
+        .await
+        .map_err(|e| format!("Failed to read directory '{}': {}", canonical.display(), e))?;
+
+    while let Some(entry) = read_dir
+        .next_entry()
+        .await
+        .map_err(|e| format!("Failed to read entry: {}", e))?
+    {
+        let name = entry
+            .file_name()
+            .to_str()
+            .unwrap_or("<invalid>")
+            .to_string();
+
+        let file_type = entry
+            .file_type()
+            .await
+            .map_err(|e| format!("Failed to get file type: {}", e))?;
+
+        let entry_type = if file_type.is_dir() {
+            "directory"
+        } else if file_type.is_symlink() {
+            "symlink"
+        } else {
+            "file"
+        }
+        .to_string();
+
+        let size = if long && file_type.is_file() {
+            entry
+                .metadata()
+                .await
+                .map(|m| Some(m.len()))
+                .unwrap_or(None)
+        } else {
+            None
+        };
+
+        entries.push(NixStoreLsEntry {
+            name,
+            entry_type,
+            size,
+        });
+    }
+
+    entries.sort_by(|a, b| a.name.cmp(&b.name));
+
+    Ok(NixStoreLsResult {
+        path: canonical.to_string_lossy().to_string(),
+        entries,
+    })
+}
+
+#[derive(Debug, Serialize)]
+pub struct NixStoreCatResult {
+    pub path: String,
+    pub content: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pagination: Option<PaginationInfo>,
+}
+
+pub async fn nix_store_cat(params: NixStoreCatParams) -> Result<NixStoreCatResult, String> {
+    let canonical = resolve_and_validate_store_path(&params.path).await?;
+
+    let content = tokio::fs::read_to_string(&canonical)
+        .await
+        .map_err(|e| format!("Failed to read file '{}': {}", canonical.display(), e))?;
+
+    let lines: Vec<&str> = content.lines().collect();
+    let total = lines.len();
+    let offset = params.offset.unwrap_or(0);
+    let limit = params.limit.unwrap_or(total);
+
+    let paginated: Vec<&str> = lines.iter().skip(offset).take(limit).copied().collect();
+    let kept_count = paginated.len();
+    let has_more = offset + kept_count < total;
+
+    let pagination = if params.offset.is_some() || params.limit.is_some() {
+        Some(PaginationInfo {
+            offset,
+            limit,
+            total,
+            has_more,
+        })
+    } else {
+        None
+    };
+
+    Ok(NixStoreCatResult {
+        path: canonical.to_string_lossy().to_string(),
+        content: paginated.join("\n"),
+        pagination,
     })
 }
