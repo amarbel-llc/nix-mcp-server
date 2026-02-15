@@ -297,118 +297,118 @@ impl Server {
 
     async fn call_tool(&self, name: &str, arguments: Value) -> Result<Value, String> {
         match name {
-            "nix_build" => {
+            "build" => {
                 let params: NixBuildParams = serde_json::from_value(arguments).unwrap_or_default();
                 let result = tools::nix_build(params).await?;
                 serde_json::to_value(result).map_err(|e| e.to_string())
             }
-            "nix_flake_show" => {
+            "flake_show" => {
                 let params: NixFlakeShowParams =
                     serde_json::from_value(arguments).unwrap_or_default();
                 let result = tools::nix_flake_show(params).await?;
                 serde_json::to_value(result).map_err(|e| e.to_string())
             }
-            "nix_flake_check" => {
+            "flake_check" => {
                 let params: NixFlakeCheckParams =
                     serde_json::from_value(arguments).unwrap_or_default();
                 let result = tools::nix_flake_check(params).await?;
                 serde_json::to_value(result).map_err(|e| e.to_string())
             }
-            "nix_flake_metadata" => {
+            "flake_metadata" => {
                 let params: NixFlakeMetadataParams =
                     serde_json::from_value(arguments).unwrap_or_default();
                 let result = tools::nix_flake_metadata(params).await?;
                 serde_json::to_value(result).map_err(|e| e.to_string())
             }
-            "nix_flake_update" => {
+            "flake_update" => {
                 let params: NixFlakeUpdateParams =
                     serde_json::from_value(arguments).unwrap_or_default();
                 let result = tools::nix_flake_update(params).await?;
                 serde_json::to_value(result).map_err(|e| e.to_string())
             }
-            "nix_flake_lock" => {
+            "flake_lock" => {
                 let params: NixFlakeLockParams =
                     serde_json::from_value(arguments).unwrap_or_default();
                 let result = tools::nix_flake_lock(params).await?;
                 serde_json::to_value(result).map_err(|e| e.to_string())
             }
-            "nix_flake_init" => {
+            "flake_init" => {
                 let params: NixFlakeInitParams =
                     serde_json::from_value(arguments).unwrap_or_default();
                 let result = tools::nix_flake_init(params).await?;
                 serde_json::to_value(result).map_err(|e| e.to_string())
             }
-            "nix_run" => {
+            "run" => {
                 let params: NixRunParams = serde_json::from_value(arguments).unwrap_or_default();
                 let result = tools::nix_run(params).await?;
                 serde_json::to_value(result).map_err(|e| e.to_string())
             }
-            "nix_develop_run" => {
+            "develop_run" => {
                 let params: NixDevelopRunParams =
                     serde_json::from_value(arguments).map_err(|e| e.to_string())?;
                 let result = tools::nix_develop_run(params).await?;
                 serde_json::to_value(result).map_err(|e| e.to_string())
             }
-            "nix_log" => {
+            "log" => {
                 let params: NixLogParams =
                     serde_json::from_value(arguments).map_err(|e| e.to_string())?;
                 let result = tools::nix_log(params).await?;
                 serde_json::to_value(result).map_err(|e| e.to_string())
             }
-            "nix_eval" => {
+            "eval" => {
                 let params: NixEvalParams = serde_json::from_value(arguments).unwrap_or_default();
                 let result = tools::nix_eval(params).await?;
                 serde_json::to_value(result).map_err(|e| e.to_string())
             }
-            "nix_search" => {
+            "search" => {
                 let params: NixSearchParams =
                     serde_json::from_value(arguments).map_err(|e| e.to_string())?;
                 let result = tools::nix_search(params).await?;
                 serde_json::to_value(result).map_err(|e| e.to_string())
             }
-            "nix_store_path_info" => {
+            "store_path_info" => {
                 let params: NixStorePathInfoParams =
                     serde_json::from_value(arguments).map_err(|e| e.to_string())?;
                 let result = tools::nix_store_path_info(params).await?;
                 serde_json::to_value(result).map_err(|e| e.to_string())
             }
-            "nix_store_gc" => {
+            "store_gc" => {
                 let params: NixStoreGcParams =
                     serde_json::from_value(arguments).unwrap_or_default();
                 let result = tools::nix_store_gc(params).await?;
                 serde_json::to_value(result).map_err(|e| e.to_string())
             }
-            "nix_store_ls" => {
+            "store_ls" => {
                 let params: NixStoreLsParams =
                     serde_json::from_value(arguments).map_err(|e| e.to_string())?;
                 let result = tools::nix_store_ls(params).await?;
                 serde_json::to_value(result).map_err(|e| e.to_string())
             }
-            "nix_store_cat" => {
+            "store_cat" => {
                 let params: NixStoreCatParams =
                     serde_json::from_value(arguments).map_err(|e| e.to_string())?;
                 let result = tools::nix_store_cat(params).await?;
                 serde_json::to_value(result).map_err(|e| e.to_string())
             }
-            "nix_derivation_show" => {
+            "derivation_show" => {
                 let params: NixDerivationShowParams =
                     serde_json::from_value(arguments).unwrap_or_default();
                 let result = tools::nix_derivation_show(params).await?;
                 serde_json::to_value(result).map_err(|e| e.to_string())
             }
-            "nix_hash_path" => {
+            "hash_path" => {
                 let params: NixHashPathParams =
                     serde_json::from_value(arguments).map_err(|e| e.to_string())?;
                 let result = tools::nix_hash_path(params).await?;
                 serde_json::to_value(result).map_err(|e| e.to_string())
             }
-            "nix_hash_file" => {
+            "hash_file" => {
                 let params: NixHashFileParams =
                     serde_json::from_value(arguments).map_err(|e| e.to_string())?;
                 let result = tools::nix_hash_file(params).await?;
                 serde_json::to_value(result).map_err(|e| e.to_string())
             }
-            "nix_copy" => {
+            "copy" => {
                 let params: NixCopyParams =
                     serde_json::from_value(arguments).map_err(|e| e.to_string())?;
                 let result = tools::nix_copy(params).await?;
