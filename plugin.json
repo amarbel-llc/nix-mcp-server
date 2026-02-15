@@ -1,6 +1,9 @@
 {
   "name": "nix",
-  "type": "stdio",
-  "command": "nix-mcp-server",
-  "args": []
+  "mcpServers": {
+    "nix": {
+      "type": "stdio",
+      "command": "nix-mcp-server"
+    }
+  }
 }
