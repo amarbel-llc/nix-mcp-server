@@ -53,6 +53,15 @@
 
         fhPkg = fh.packages.${system}.default;
 
+        formatNixHook = pkgs.writeShellScript "format-nix" ''
+          set -euo pipefail
+          input=$(cat)
+          file_path=$(${pkgs.jq}/bin/jq -r '.tool_input.file_path // empty' <<< "$input")
+          if [[ -n "$file_path" && "$file_path" == *.nix ]]; then
+            ${pkgs.nixfmt-rfc-style}/bin/nixfmt "$file_path" 2>/dev/null || true
+          fi
+        '';
+
         # Note: We don't bundle nix itself - we use the system nix.
         # This ensures compatibility with Determinate Nix settings like lazy-trees.
         nix-mcp-server =
@@ -71,8 +80,9 @@
                   ]
                 }
 
-              mkdir -p $out/share/purse-first/nix
+              mkdir -p $out/share/purse-first/nix/hooks
               cp ${./plugin.json} $out/share/purse-first/nix/plugin.json
+              install -m 755 ${formatNixHook} $out/share/purse-first/nix/hooks/format-nix
             '';
       in
       {
