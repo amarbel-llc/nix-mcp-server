@@ -70,6 +70,9 @@
                     pkgs.nil
                   ]
                 }
+
+              mkdir -p $out/share/purse-first/nix
+              cp ${./plugin.json} $out/share/purse-first/nix/plugin.json
             '';
       in
       {

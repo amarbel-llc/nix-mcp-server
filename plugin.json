@@ -1,0 +1,6 @@
+{
+  "name": "nix",
+  "type": "stdio",
+  "command": "nix-mcp-server",
+  "args": []
+}
