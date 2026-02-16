@@ -193,6 +193,8 @@ pub struct NixStoreLsEntry {
 pub struct NixStoreLsResult {
     pub path: String,
     pub entries: Vec<NixStoreLsEntry>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pagination: Option<PaginationInfo>,
 }
 
 pub async fn nix_store_ls(params: NixStoreLsParams) -> Result<NixStoreLsResult, String> {
@@ -248,9 +250,29 @@ pub async fn nix_store_ls(params: NixStoreLsParams) -> Result<NixStoreLsResult, 
 
     entries.sort_by(|a, b| a.name.cmp(&b.name));
 
+    let total = entries.len();
+    let offset = params.offset.unwrap_or(0);
+    let limit = params.limit.unwrap_or(total);
+
+    let paginated: Vec<NixStoreLsEntry> = entries.into_iter().skip(offset).take(limit).collect();
+    let kept_count = paginated.len();
+    let has_more = offset + kept_count < total;
+
+    let pagination = if params.offset.is_some() || params.limit.is_some() {
+        Some(PaginationInfo {
+            offset,
+            limit,
+            total,
+            has_more,
+        })
+    } else {
+        None
+    };
+
     Ok(NixStoreLsResult {
         path: canonical.to_string_lossy().to_string(),
-        entries,
+        entries: paginated,
+        pagination,
     })
 }
 

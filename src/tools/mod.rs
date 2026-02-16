@@ -373,6 +373,14 @@ pub fn list_tools() -> Vec<ToolInfo> {
                     "long": {
                         "type": "boolean",
                         "description": "Include file sizes for regular files. Defaults to false."
+                    },
+                    "offset": {
+                        "type": "integer",
+                        "description": "Skip first N entries for pagination. Defaults to 0."
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Maximum number of entries to return. Defaults to all entries."
                     }
                 },
                 "required": ["path"]
@@ -931,6 +939,8 @@ pub struct NixStoreGcParams {
 pub struct NixStoreLsParams {
     pub path: String,
     pub long: Option<bool>,
+    pub offset: Option<usize>,
+    pub limit: Option<usize>,
 }
 
 #[derive(Debug, Deserialize)]
