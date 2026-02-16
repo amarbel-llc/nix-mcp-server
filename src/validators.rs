@@ -44,10 +44,9 @@ static STORE_PATH_PATTERN: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"^/nix/store/[a-z0-9]{32}-[a-zA-Z0-9._\-]+$").unwrap());
 
 // Nix store subpaths: /nix/store/<32-char-hash>-<name>[/<sub-path>]
-// Each path component must contain at least one non-dot character to reject . and ..
+// Allows dotfiles; . and .. are rejected programmatically in validate_store_subpath
 static STORE_SUBPATH_PATTERN: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"^/nix/store/[a-z0-9]{32}-[a-zA-Z0-9._\-]+(/[a-zA-Z0-9_\-][a-zA-Z0-9._\-]*)*$")
-        .unwrap()
+    Regex::new(r"^/nix/store/[a-z0-9]{32}-[a-zA-Z0-9._\-]+(/[a-zA-Z0-9._\-]+)*$").unwrap()
 });
 
 // File paths: no shell metacharacters, reasonable characters
@@ -105,6 +104,9 @@ pub fn validate_store_path(path: &str) -> Result<&str, ValidationError> {
 
 pub fn validate_store_subpath(path: &str) -> Result<&str, ValidationError> {
     if !STORE_SUBPATH_PATTERN.is_match(path) {
+        return Err(ValidationError::InvalidStoreSubpath(path.to_string()));
+    }
+    if path.split('/').any(|c| c == "." || c == "..") {
         return Err(ValidationError::InvalidStoreSubpath(path.to_string()));
     }
     Ok(path)
@@ -196,6 +198,38 @@ mod tests {
         .is_err());
         assert!(validate_store_subpath(
             "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-hello/bin;whoami"
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn test_store_subpath_dotfiles() {
+        assert!(validate_store_subpath(
+            "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-pkg/.claude-plugin"
+        )
+        .is_ok());
+        assert!(validate_store_subpath(
+            "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-pkg/.config/settings"
+        )
+        .is_ok());
+        assert!(validate_store_subpath(
+            "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-pkg/.hidden-dir/.hidden-file"
+        )
+        .is_ok());
+        assert!(validate_store_subpath(
+            "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-pkg/."
+        )
+        .is_err());
+        assert!(validate_store_subpath(
+            "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-pkg/.."
+        )
+        .is_err());
+        assert!(validate_store_subpath(
+            "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-pkg/./bin"
+        )
+        .is_err());
+        assert!(validate_store_subpath(
+            "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-pkg/../other"
         )
         .is_err());
     }
