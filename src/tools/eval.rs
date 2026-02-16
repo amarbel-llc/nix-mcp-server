@@ -1,4 +1,5 @@
 use crate::nix_runner::run_nix_command_in_dir;
+use crate::output::{limit_text_output, OutputLimits, TruncationInfo};
 use crate::tools::NixEvalParams;
 use crate::validators::{validate_installable, validate_no_shell_metacharacters, validate_path};
 use serde::Serialize;
@@ -8,6 +9,10 @@ pub struct NixEvalResult {
     pub success: bool,
     pub value: serde_json::Value,
     pub stderr: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub truncated: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub truncation_info: Option<TruncationInfo>,
 }
 
 pub async fn nix_eval(params: NixEvalParams) -> Result<NixEvalResult, String> {
@@ -65,15 +70,33 @@ pub async fn nix_eval(params: NixEvalParams) -> Result<NixEvalResult, String> {
         .await
         .map_err(|e| e.to_string())?;
 
-    let value = if result.success {
-        serde_json::from_str(&result.stdout).unwrap_or(serde_json::Value::Null)
-    } else {
-        serde_json::Value::Null
+    if !result.success {
+        return Ok(NixEvalResult {
+            success: false,
+            value: serde_json::Value::Null,
+            stderr: result.stderr,
+            truncated: None,
+            truncation_info: None,
+        });
+    }
+
+    let limits = OutputLimits {
+        head: params.head,
+        tail: params.tail,
+        max_bytes: params.max_bytes,
+        max_lines: None,
     };
 
+    let limited = limit_text_output(&result.stdout, &limits);
+
+    let value =
+        serde_json::from_str(&limited.content).unwrap_or(serde_json::Value::String(limited.content));
+
     Ok(NixEvalResult {
-        success: result.success,
+        success: true,
         value,
         stderr: result.stderr,
+        truncated: if limited.truncated { Some(true) } else { None },
+        truncation_info: limited.truncation_info,
     })
 }

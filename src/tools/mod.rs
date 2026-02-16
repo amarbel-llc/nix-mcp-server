@@ -87,6 +87,18 @@ pub fn list_tools() -> Vec<ToolInfo> {
                     "flake_dir": {
                         "type": "string",
                         "description": "Directory containing the flake. Defaults to current directory."
+                    },
+                    "max_bytes": {
+                        "type": "integer",
+                        "description": "Maximum bytes of output to return. Defaults to config value (100KB)."
+                    },
+                    "head": {
+                        "type": "integer",
+                        "description": "Only return the first N lines of output."
+                    },
+                    "tail": {
+                        "type": "integer",
+                        "description": "Only return the last N lines of output."
                     }
                 }
             }),
@@ -137,6 +149,18 @@ pub fn list_tools() -> Vec<ToolInfo> {
                     "flake_dir": {
                         "type": "string",
                         "description": "Directory containing the flake. Defaults to current directory."
+                    },
+                    "max_bytes": {
+                        "type": "integer",
+                        "description": "Maximum bytes of output to return. Defaults to config value (100KB)."
+                    },
+                    "head": {
+                        "type": "integer",
+                        "description": "Only return the first N lines of output."
+                    },
+                    "tail": {
+                        "type": "integer",
+                        "description": "Only return the last N lines of output."
                     }
                 }
             }),
@@ -536,6 +560,18 @@ pub fn list_tools() -> Vec<ToolInfo> {
                     "flake_dir": {
                         "type": "string",
                         "description": "Directory containing the flake. Defaults to current directory."
+                    },
+                    "max_bytes": {
+                        "type": "integer",
+                        "description": "Maximum bytes of output to return. Defaults to config value (100KB)."
+                    },
+                    "head": {
+                        "type": "integer",
+                        "description": "Only return the first N lines of output."
+                    },
+                    "tail": {
+                        "type": "integer",
+                        "description": "Only return the last N lines of output."
                     }
                 }
             }),
@@ -552,7 +588,15 @@ pub fn list_tools() -> Vec<ToolInfo> {
                     },
                     "max_results": {
                         "type": "integer",
-                        "description": "Maximum number of results to return. Defaults to 10."
+                        "description": "Maximum number of results to return from FlakeHub API. Defaults to 10."
+                    },
+                    "offset": {
+                        "type": "integer",
+                        "description": "Skip first N results for pagination. Defaults to 0."
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Maximum number of results to return. Defaults to all."
                     }
                 },
                 "required": ["query"]
@@ -589,6 +633,10 @@ pub fn list_tools() -> Vec<ToolInfo> {
                     "limit": {
                         "type": "integer",
                         "description": "Maximum number of flakes to return."
+                    },
+                    "offset": {
+                        "type": "integer",
+                        "description": "Skip first N results for pagination. Defaults to 0."
                     }
                 }
             }),
@@ -606,6 +654,10 @@ pub fn list_tools() -> Vec<ToolInfo> {
                     "limit": {
                         "type": "integer",
                         "description": "Maximum number of releases to return."
+                    },
+                    "offset": {
+                        "type": "integer",
+                        "description": "Skip first N results for pagination. Defaults to 0."
                     }
                 },
                 "required": ["flake"]
@@ -628,6 +680,10 @@ pub fn list_tools() -> Vec<ToolInfo> {
                     "limit": {
                         "type": "integer",
                         "description": "Maximum number of versions to return."
+                    },
+                    "offset": {
+                        "type": "integer",
+                        "description": "Skip first N results for pagination. Defaults to 0."
                     }
                 },
                 "required": ["flake", "version_constraint"]
@@ -753,6 +809,14 @@ pub fn list_tools() -> Vec<ToolInfo> {
                     "file_path": {
                         "type": "string",
                         "description": "Absolute path to the .nix file to analyze."
+                    },
+                    "offset": {
+                        "type": "integer",
+                        "description": "Skip first N diagnostics for pagination. Defaults to 0."
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Maximum number of diagnostics to return. Defaults to all."
                     }
                 },
                 "required": ["file_path"]
@@ -775,6 +839,14 @@ pub fn list_tools() -> Vec<ToolInfo> {
                     "character": {
                         "type": "integer",
                         "description": "0-indexed character offset within the line."
+                    },
+                    "offset": {
+                        "type": "integer",
+                        "description": "Skip first N completions for pagination. Defaults to 0."
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Maximum number of completions to return. Defaults to all."
                     }
                 },
                 "required": ["file_path", "line", "character"]
@@ -841,6 +913,9 @@ pub struct NixFlakeShowParams {
     pub flake_ref: Option<String>,
     pub all_systems: Option<bool>,
     pub flake_dir: Option<String>,
+    pub max_bytes: Option<usize>,
+    pub head: Option<usize>,
+    pub tail: Option<usize>,
 }
 
 #[derive(Debug, Deserialize, Default)]
@@ -857,6 +932,9 @@ pub struct NixFlakeCheckParams {
 pub struct NixFlakeMetadataParams {
     pub flake_ref: Option<String>,
     pub flake_dir: Option<String>,
+    pub max_bytes: Option<usize>,
+    pub head: Option<usize>,
+    pub tail: Option<usize>,
 }
 
 #[derive(Debug, Deserialize, Default)]
@@ -909,6 +987,9 @@ pub struct NixEvalParams {
     pub expr: Option<String>,
     pub apply: Option<String>,
     pub flake_dir: Option<String>,
+    pub max_bytes: Option<usize>,
+    pub head: Option<usize>,
+    pub tail: Option<usize>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -987,6 +1068,8 @@ pub struct NixCopyParams {
 pub struct FhSearchParams {
     pub query: String,
     pub max_results: Option<usize>,
+    pub offset: Option<usize>,
+    pub limit: Option<usize>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -999,12 +1082,14 @@ pub struct FhAddParams {
 #[derive(Debug, Deserialize, Default)]
 pub struct FhListFlakesParams {
     pub limit: Option<usize>,
+    pub offset: Option<usize>,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct FhListReleasesParams {
     pub flake: String,
     pub limit: Option<usize>,
+    pub offset: Option<usize>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -1012,6 +1097,7 @@ pub struct FhListVersionsParams {
     pub flake: String,
     pub version_constraint: String,
     pub limit: Option<usize>,
+    pub offset: Option<usize>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -1059,6 +1145,8 @@ pub struct TaskStatusParams {
 #[derive(Debug, Deserialize)]
 pub struct NilDiagnosticsParams {
     pub file_path: String,
+    pub offset: Option<usize>,
+    pub limit: Option<usize>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -1066,6 +1154,8 @@ pub struct NilCompletionsParams {
     pub file_path: String,
     pub line: u32,
     pub character: u32,
+    pub offset: Option<usize>,
+    pub limit: Option<usize>,
 }
 
 #[derive(Debug, Deserialize)]

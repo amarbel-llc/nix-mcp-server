@@ -509,14 +509,21 @@ impl Server {
             "nil_diagnostics" => {
                 let params: NilDiagnosticsParams =
                     serde_json::from_value(arguments).map_err(|e| e.to_string())?;
-                let result = tools::nil_diagnostics(params.file_path).await?;
+                let result =
+                    tools::nil_diagnostics(params.file_path, params.offset, params.limit).await?;
                 serde_json::to_value(result).map_err(|e| e.to_string())
             }
             "nil_completions" => {
                 let params: NilCompletionsParams =
                     serde_json::from_value(arguments).map_err(|e| e.to_string())?;
-                let result =
-                    tools::nil_completions(params.file_path, params.line, params.character).await?;
+                let result = tools::nil_completions(
+                    params.file_path,
+                    params.line,
+                    params.character,
+                    params.offset,
+                    params.limit,
+                )
+                .await?;
                 serde_json::to_value(result).map_err(|e| e.to_string())
             }
             "nil_hover" => {

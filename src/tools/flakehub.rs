@@ -1,4 +1,5 @@
 use crate::nix_runner::run_fh_command;
+use crate::output::PaginationInfo;
 use crate::tools::{
     FhAddParams, FhFetchParams, FhListFlakesParams, FhListReleasesParams, FhListVersionsParams,
     FhLoginParams, FhResolveParams, FhSearchParams,
@@ -6,11 +7,44 @@ use crate::tools::{
 use crate::validators::{validate_no_shell_metacharacters, validate_path};
 use serde::Serialize;
 
+fn paginate_json_array(
+    value: serde_json::Value,
+    offset: Option<usize>,
+    limit: Option<usize>,
+) -> (serde_json::Value, Option<PaginationInfo>) {
+    if let serde_json::Value::Array(arr) = value {
+        let total = arr.len();
+        let off = offset.unwrap_or(0);
+        let lim = limit.unwrap_or(total);
+
+        let paginated: Vec<serde_json::Value> = arr.into_iter().skip(off).take(lim).collect();
+        let kept_count = paginated.len();
+        let has_more = off + kept_count < total;
+
+        let pagination = if offset.is_some() || limit.is_some() {
+            Some(PaginationInfo {
+                offset: off,
+                limit: lim,
+                total,
+                has_more,
+            })
+        } else {
+            None
+        };
+
+        (serde_json::Value::Array(paginated), pagination)
+    } else {
+        (value, None)
+    }
+}
+
 #[derive(Debug, Serialize)]
 pub struct FhSearchResult {
     pub success: bool,
     pub results: serde_json::Value,
     pub stderr: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pagination: Option<PaginationInfo>,
 }
 
 #[derive(Debug, Serialize)]
@@ -25,6 +59,8 @@ pub struct FhListResult {
     pub success: bool,
     pub results: serde_json::Value,
     pub stderr: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pagination: Option<PaginationInfo>,
 }
 
 #[derive(Debug, Serialize)]
@@ -49,16 +85,19 @@ pub async fn fh_search(params: FhSearchParams) -> Result<FhSearchResult, String>
 
     let result = run_fh_command(&args).await.map_err(|e| e.to_string())?;
 
-    let results = if result.success {
+    let parsed = if result.success {
         serde_json::from_str(&result.stdout).unwrap_or(serde_json::Value::Null)
     } else {
         serde_json::Value::Null
     };
 
+    let (results, pagination) = paginate_json_array(parsed, params.offset, params.limit);
+
     Ok(FhSearchResult {
         success: result.success,
         results,
         stderr: result.stderr,
+        pagination,
     })
 }
 
@@ -106,16 +145,19 @@ pub async fn fh_list_flakes(params: FhListFlakesParams) -> Result<FhListResult, 
 
     let result = run_fh_command(&args).await.map_err(|e| e.to_string())?;
 
-    let results = if result.success {
+    let parsed = if result.success {
         serde_json::from_str(&result.stdout).unwrap_or(serde_json::Value::Null)
     } else {
         serde_json::Value::Null
     };
 
+    let (results, pagination) = paginate_json_array(parsed, params.offset, params.limit);
+
     Ok(FhListResult {
         success: result.success,
         results,
         stderr: result.stderr,
+        pagination,
     })
 }
 
@@ -134,16 +176,19 @@ pub async fn fh_list_releases(params: FhListReleasesParams) -> Result<FhListResu
 
     let result = run_fh_command(&args).await.map_err(|e| e.to_string())?;
 
-    let results = if result.success {
+    let parsed = if result.success {
         serde_json::from_str(&result.stdout).unwrap_or(serde_json::Value::Null)
     } else {
         serde_json::Value::Null
     };
 
+    let (results, pagination) = paginate_json_array(parsed, params.offset, params.limit);
+
     Ok(FhListResult {
         success: result.success,
         results,
         stderr: result.stderr,
+        pagination,
     })
 }
 
@@ -164,16 +209,19 @@ pub async fn fh_list_versions(params: FhListVersionsParams) -> Result<FhListResu
 
     let result = run_fh_command(&args).await.map_err(|e| e.to_string())?;
 
-    let results = if result.success {
+    let parsed = if result.success {
         serde_json::from_str(&result.stdout).unwrap_or(serde_json::Value::Null)
     } else {
         serde_json::Value::Null
     };
 
+    let (results, pagination) = paginate_json_array(parsed, params.offset, params.limit);
+
     Ok(FhListResult {
         success: result.success,
         results,
         stderr: result.stderr,
+        pagination,
     })
 }
 

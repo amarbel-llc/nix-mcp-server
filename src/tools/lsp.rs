@@ -1,4 +1,5 @@
 use crate::lsp_client::{create_nil_client, LspClient};
+use crate::output::PaginationInfo;
 use crate::validators::validate_no_shell_metacharacters;
 use serde::Serialize;
 use std::path::Path;
@@ -9,6 +10,8 @@ pub struct DiagnosticsResult {
     pub file_path: String,
     pub diagnostics: Vec<DiagnosticInfo>,
     pub error: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pagination: Option<PaginationInfo>,
 }
 
 #[derive(Debug, Serialize)]
@@ -27,6 +30,8 @@ pub struct CompletionsResult {
     pub success: bool,
     pub completions: Vec<CompletionInfo>,
     pub error: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pagination: Option<PaginationInfo>,
 }
 
 #[derive(Debug, Serialize)]
@@ -120,7 +125,11 @@ async fn read_file_contents(path: &str) -> Result<String, String> {
         .map_err(|e| format!("Failed to read file: {}", e))
 }
 
-pub async fn nil_diagnostics(file_path: String) -> Result<DiagnosticsResult, String> {
+pub async fn nil_diagnostics(
+    file_path: String,
+    offset: Option<usize>,
+    limit: Option<usize>,
+) -> Result<DiagnosticsResult, String> {
     validate_no_shell_metacharacters(&file_path).map_err(|e| e.to_string())?;
 
     let path = Path::new(&file_path);
@@ -130,6 +139,7 @@ pub async fn nil_diagnostics(file_path: String) -> Result<DiagnosticsResult, Str
             file_path,
             diagnostics: vec![],
             error: Some("File not found".to_string()),
+            pagination: None,
         });
     }
 
@@ -153,7 +163,7 @@ pub async fn nil_diagnostics(file_path: String) -> Result<DiagnosticsResult, Str
 
     let _ = client.shutdown().await;
 
-    let diagnostic_infos: Vec<DiagnosticInfo> = diagnostics
+    let all_infos: Vec<DiagnosticInfo> = diagnostics
         .into_iter()
         .map(|d| DiagnosticInfo {
             line: d.range.start.line,
@@ -166,11 +176,31 @@ pub async fn nil_diagnostics(file_path: String) -> Result<DiagnosticsResult, Str
         })
         .collect();
 
+    let total = all_infos.len();
+    let off = offset.unwrap_or(0);
+    let lim = limit.unwrap_or(total);
+
+    let paginated: Vec<DiagnosticInfo> = all_infos.into_iter().skip(off).take(lim).collect();
+    let kept_count = paginated.len();
+    let has_more = off + kept_count < total;
+
+    let pagination = if offset.is_some() || limit.is_some() {
+        Some(PaginationInfo {
+            offset: off,
+            limit: lim,
+            total,
+            has_more,
+        })
+    } else {
+        None
+    };
+
     Ok(DiagnosticsResult {
         success: true,
         file_path,
-        diagnostics: diagnostic_infos,
+        diagnostics: paginated,
         error: None,
+        pagination,
     })
 }
 
@@ -178,6 +208,8 @@ pub async fn nil_completions(
     file_path: String,
     line: u32,
     character: u32,
+    offset: Option<usize>,
+    limit: Option<usize>,
 ) -> Result<CompletionsResult, String> {
     validate_no_shell_metacharacters(&file_path).map_err(|e| e.to_string())?;
 
@@ -187,6 +219,7 @@ pub async fn nil_completions(
             success: false,
             completions: vec![],
             error: Some("File not found".to_string()),
+            pagination: None,
         });
     }
 
@@ -213,7 +246,7 @@ pub async fn nil_completions(
 
     let _ = client.shutdown().await;
 
-    let completion_infos: Vec<CompletionInfo> = completions
+    let all_infos: Vec<CompletionInfo> = completions
         .into_iter()
         .map(|c| CompletionInfo {
             label: c.label,
@@ -223,10 +256,30 @@ pub async fn nil_completions(
         })
         .collect();
 
+    let total = all_infos.len();
+    let off = offset.unwrap_or(0);
+    let lim = limit.unwrap_or(total);
+
+    let paginated: Vec<CompletionInfo> = all_infos.into_iter().skip(off).take(lim).collect();
+    let kept_count = paginated.len();
+    let has_more = off + kept_count < total;
+
+    let pagination = if offset.is_some() || limit.is_some() {
+        Some(PaginationInfo {
+            offset: off,
+            limit: lim,
+            total,
+            has_more,
+        })
+    } else {
+        None
+    };
+
     Ok(CompletionsResult {
         success: true,
-        completions: completion_infos,
+        completions: paginated,
         error: None,
+        pagination,
     })
 }
 
